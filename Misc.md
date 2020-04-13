@@ -353,6 +353,27 @@ if __name__ == '__main__':
 ## Random（i春秋）
 1. EasyPythonDecompiler反编译.pyo文件
 2. 根据encrypt.pyo_dis和flag.enc提供的密文，编写解密脚本
+```
+from random import randint
+from math import floor, sqrt
+import string
+
+data=[208,140,149,236,189,77,193,104,202,184,97,236,148,202,244,199,77,122,113]
+prints = string.printable
+
+for key in range(65,128):
+    flag=''
+    key = key * 255
+    for i in range(19):
+        for char in prints:
+            if ord(char) > 64:
+                a = int(floor(float(key + ord(char)) / 2 + sqrt( key * ord(char))) % 255)
+            
+                if a == data[i]:
+                    flag+=char
+    if len(flag)==19:
+        print flag
+```
 
 ## warmup（i春秋）
 1. 明文攻击
@@ -371,4 +392,29 @@ if __name__ == '__main__':
    192.168.0.9第2次攻击数据包序号：148007
    192.168.0.9第3次攻击数据包序号：150753
    192.168.0.199第4次攻击数据包序号：155989
+
+## pyHAHA（i春秋）
+1. 编写脚本将整个文件倒序为123.py
+```
+a = open('PyHaHa.pyc,'rb').read();
+b = open('123.pyc','wb');
+b.write(a[::-1]);
+``` 
+2. foremost 提取123.py 
+3. 压缩文件为伪加密，搜索0908改为0008，得到.mp3文件
+4. 后面暂时未做
+
+## 爆破？？（i春秋）
+1. 修改后缀，明文攻击
+
+## embarrass（i春秋）
+1. Notepad打开搜索flag即可
+
+## 登机牌（i春秋）
+1. 修复二维码三个角定位符
+2. 扫码，binwalk 查看，有压缩文件
+3. 修改RAR文件头为52 61 72 21 ，导出为.rar
+4. 解压，pdf密码为条形码反色后扫描
+
+
 
