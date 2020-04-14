@@ -223,3 +223,85 @@ for i in range(0,20):
 print flag
 ```
 
+## 怀疑人生 (bugku)
+
+1. 添加zip后缀解压里面有三个文件
+2. 直接用archpr暴力破解ctf1.zip，解压后有个txt,base64decode后unicode解码，得到第一部分flg
+3. binwalk分析ctf2.jpg，发现里面有zip文件，分离出来之后解压里面有个txt文件，发现是ook编码，得到3oD54e
+4. 第三部分是个二维码，但比较模糊，qq能直接扫出来，也可以用QRsearch分析出来
+5. 提交flag显示不正确，原来第二部分得到的3oD54e需要base58解码
+
+## 红绿灯 (bugku)
+
+1. gif，打开后发现是一个闪烁的红绿灯共1168帧
+2. 一帧一帧查看发现多数是红色和绿色，偶尔有黄色且（每8个红绿后跟一个黄），可以推测红色和绿色对应二进制0和1，黄色作为分隔，这样第一个黄灯之前数值为01100110或10011001，而01100110二进制转成ascii对应字符就是‘f’,依次可以验证前四个字符为flag
+3. 记录下所有的红绿灯，用Python跑出flag
+
+```
+f=open("1.txt",'r')
+res=''
+for i in range(100):
+    s='0'+f.read(7)
+    res+=chr(int(s,2))
+print(res)
+```
+
+## 不简单的压缩包 (bugku)
+
+这题很奇怪，我用win和kali打开zip包显示内容不一样，foremost分离出两个zip包
+
+## 一枝独秀
+
+1. 修改后缀为zip，解压后里面是一枝独秀.jpg，但是打不开
+2. 用binwalk分析这个jpg，里面只有一个zip文件，修改后缀为zip
+3. 用winrar打开zip，发现里面有很多张jpg，但是81.jpg的CRC32和大小与其他图片不一样
+4. 用archpr爆破zip密码，解密后分析81.jpg
+5. 使用JPHS提取出一个文件，binwalk分析这个文件，是个zip，解压后里面有个txt
+6. 里面是一段佛曰加密，[使用这个网站解密](http://www.keyfc.net/bbs/tools/tudoucode.aspx)，再用栅栏解密，再base64转码
+
+> [大佬的wp](https://blog.csdn.net/qq_33184105/article/details/102756753)
+
+## 好多压缩包(bugku)
+
+1. 打开之后好多zip文件，并且每个压缩文件里都有一个4个字节大小的名为data.txt的txt文件，于是尝试用**crc32碰撞**还原出所有压缩包中的文件内容，脚本如下：
+
+```
+import zipfile
+import string
+import binascii
+ 
+def CrackCrc(crc):
+    for i in dic:
+        for j in dic:
+            for p in dic:
+                for q in dic:
+                    s = i + j + p + q
+                    if crc == (binascii.crc32(s) & 0xffffffff):
+                        #print s
+                        f.write(s)
+                        return
+ 
+def CrackZip():
+    for I in range(68):
+        file = 'out' + str(I) + '.zip'
+        f = zipfile.ZipFile(file, 'r')
+        GetCrc = f.getinfo('data.txt')
+        crc = GetCrc.CRC
+        CrackCrc(crc)
+ 
+dic = string.ascii_letters + string.digits + '+/='
+ 
+f = open('out.txt', 'w')
+CrackZip()
+f.close()
+```
+2. 碰撞出来的是一串base64，粘到nodepad++里转码，再另存为txt,导入010editor中，
+3. 发现文件尾为rar的文件尾C43D7B00400700，但没有头部，给头部补上526172211A0700，修改后缀为rar,打开后flag在备注里
+
+
+## 一个普通的压缩包（bugku）
+
+1. 一个rar包，解压后里面有个flag.rar,解压时提示secret.png损坏
+2. 用010editor打开flag.rar，修改A8 3C 7改成A8 3C 74（不清楚为啥，说是文件头损坏，但是png的文件头不是这个）
+3. 打开后用stegsolve打开，在灰色通道里看见半张二维码，010打开发现文件是gif,有两帧，拼成完整的二维码
+
