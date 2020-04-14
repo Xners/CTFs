@@ -222,6 +222,201 @@ for i in range(0,20):
  
 print flag
 ```
+## 传感器1（i春秋）
+1. 硬件传感器考虑曼彻斯特编码
+2. 解码后与ID对照，发现8位逆序（网络传输特性）
+3. 八位逆序后得到原数据电平
+```
+# -*-coding:utf-8 -*-
+#差分曼彻斯特解码（已知变化电平，求数据电平）
+
+n=0x5555555595555A65556AA696AA6666666955
+flag=''
+bs='0'+bin(n)[2:]
+r=''
+def conv(s):
+    return hex(int(s,2))[2:]
+
+#标准曼彻斯特，01电平跳变表示数据电平的1, 10的电平跳变表示数据电平的0。
+for i in range(0,len(bs),2):
+        if bs[i:i+2]=='01'#01电平变化，原数据位为0
+            r+='1'
+        else:
+            r+='0'
+
+#根据八位倒序传输协议将二进制每八位reverse
+#11111111 11111111 01111111 11001011 11111000 00100110 00001010 10101010 10011111
+#11111111 11111111 11111110 11010011 00011111 01100100 01010000 01010101 11111001
+#将逆序后的字符串每4位转hex（二进制变为16进制）
+for i in range(0,len(r),8):
+    tmp=r[i:i+8][::-1]
+    flag+=conv(tmp[:4])
+    flag+=conv(tmp[4:])
+print flag.upper()
+```
+
+## 传感器2（i春秋）
+1. 与传感器1相同变换得到原数据电平
+2. 观察未知位的数据特点
+
+## Matrix（i春秋）
+1. 十六进制转二进制
+2. 0表示白色，1表示黑色画图
+```
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+ 
+import PIL.Image
+import numpy as np
+ 
+def hex2bin(hexmat):
+    binmattemp = [bin(m)[2:] for m in hexmat]
+    rowlen = max([len(m) for m in binmattemp])
+    binmat = [[0]+[int(b) for b in row.zfill(rowlen)] for row in binmattemp]
+ 
+    print rowlen+1, 'x', len(binmat)
+    for i in xrange(len(binmat)):
+        print ''.join([str(b) for b in binmat[i]])
+ 
+    return binmat, rowlen+1, len(binmat)
+ 
+def rm_col(binmat, col):
+    return [row[:col]+row[col+1:] for row in binmat]
+ 
+ 
+def make_bw_img(binmat, w, h, outfilename, blackbit=0):
+ 
+    bwmat = [[0 if b==blackbit else 255 for b in row] for row in binmat]
+ 
+    imagesize = (w, h)
+    img = PIL.Image.fromarray(np.uint8(np.array(bwmat)))
+    img.save(outfilename)
+ 
+if __name__ == '__main__':
+    hexmat = [0x00000000,
+              0xff71fefe,
+              0x83480082,
+              0xbb4140ba,
+              0xbb6848ba,
+              0xbb4a80ba,
+              0x83213082,
+              # 0xff5556fe,
+              0xff5556fe,
+              0x00582e00,
+              0x576fb9be,
+              0x707ef09e,
+              0xe74b41d6,
+              0xa82c0f16,
+              0x27a15690,
+              0x8c643628,
+              0xbfcbf976,
+              0x4cd959aa,
+              0x2f43d73a,
+              0x5462300a,
+              0x57290106,
+              0xb02ace5a,
+              # 0xef53f7fc,
+              0xef53f7fc,
+              0x00402e36,
+              0xff01b6a8,
+              0x83657e3a,
+              0xbb3b27fa,
+              0xbb5eaeac,
+              0xbb1017a0,
+              0x8362672c,
+              0xff02a650,
+              0x00000000]
+ 
+    binmat, w, h = hex2bin(hexmat)
+    binmat = rm_col(binmat, 22)
+    binmat = rm_col(binmat, 7)
+    make_bw_img(binmat, w, h, 'matrix_rmcol.png', blackbit=1)
+```
+## CryMisc（i春秋）
+1. jiami.py和gogogo.zip考虑明文攻击
+2. 提取RSA.encrypt，解RSA，得到AES加密过后的key
+3. 根据AESencrypt.py编写AES解密脚本对key进行AES解密，得到next.zip
+4. 解压后根据encrypt.py编写逆解密脚本，得到flag.jpg
+5. FFD9文件结束后，发现8BPS和8BIM字样，推测为psd图片，PS打开
+6. 背景层另存为png，StegSolve提取，得到二维码
+7. 扫码
+
+## Scavenger Hunt（i春秋）
+1. 下载目标站点 wget -r https://icec.tf
+2. 搜索匹配字符：grep -ir icectf{ * 
+
+## 神秘的文件（i春秋）
+1. 更改后缀名为.png
+2. StegSolve -> save bin蓝色最低位
+3. 修改文件尾部的数据为424D的bmp文件头
+
+## Random（i春秋）
+1. EasyPythonDecompiler反编译.pyo文件
+2. 根据encrypt.pyo_dis和flag.enc提供的密文，编写解密脚本
+```
+from random import randint
+from math import floor, sqrt
+import string
+
+data=[208,140,149,236,189,77,193,104,202,184,97,236,148,202,244,199,77,122,113]
+prints = string.printable
+
+for key in range(65,128):
+    flag=''
+    key = key * 255
+    for i in range(19):
+        for char in prints:
+            if ord(char) > 64:
+                a = int(floor(float(key + ord(char)) / 2 + sqrt( key * ord(char))) % 255)
+            
+                if a == data[i]:
+                    flag+=char
+    if len(flag)==19:
+        print flag
+```
+
+## warmup（i春秋）
+1. 明文攻击
+2. 相似图片提取盲水印
+
+## 流量分析（i春秋）
+1. 搜索出flag相关数据流（FTP），save as "原始文件"，导出flag.zip、key.log等
+2. http流存在TSL加密，利用key.log进行解密【编辑→首选项→Protocols→TLS，然后在下面导入key.log文件】
+3. http导出，zip包内mp3查看频谱图
+4. 频谱图密码解密flag.zip，得到flag.txt
+
+## SCAN(i春秋)
+1. ICMP协议筛选出攻击数据包
+2. 9/199 为同一台机器，对99目标机发起攻击：
+   192.168.0.9发起第1次攻击数据包序号：1
+   192.168.0.9第2次攻击数据包序号：148007
+   192.168.0.9第3次攻击数据包序号：150753
+   192.168.0.199第4次攻击数据包序号：155989
+
+## pyHAHA（i春秋）
+1. 编写脚本将整个文件倒序为123.py
+```
+a = open('PyHaHa.pyc,'rb').read();
+b = open('123.pyc','wb');
+b.write(a[::-1]);
+``` 
+2. foremost 提取123.py 
+3. 压缩文件为伪加密，搜索0908改为0008，得到.mp3文件
+4. 后面暂时未做
+
+## 爆破？？（i春秋）
+1. 修改后缀，明文攻击
+
+## embarrass（i春秋）
+1. Notepad打开搜索flag即可
+
+## 登机牌（i春秋）
+1. 修复二维码三个角定位符
+2. 扫码，binwalk 查看，有压缩文件
+3. 修改RAR文件头为52 61 72 21 ，导出为.rar
+4. 解压，pdf密码为条形码反色后扫描
+
+
 
 ## 怀疑人生 (bugku)
 
