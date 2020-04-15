@@ -402,7 +402,11 @@ b.write(a[::-1]);
 ``` 
 2. foremost 提取123.py 
 3. 压缩文件为伪加密，搜索0908改为0008，得到.mp3文件
-4. 后面暂时未做
+4. DeEgger Embedder提取.mp3里的隐藏信息，得到base32编码的txt
+5. 将每行编码b32decode，再b32encode()，
+6. 带“=”结尾的字符串base后被修改为1，未修改为0（本地尝试比较开始出错，没再继续做）
+7. 按照01画图……等。
+	大佬的wp：https://bbs.ichunqiu.com/thread-25351-1-1.html
 
 ## 爆破？？（i春秋）
 1. 修改后缀，明文攻击
@@ -497,4 +501,74 @@ f.close()
 1. 一个rar包，解压后里面有个flag.rar,解压时提示secret.png损坏
 2. 用010editor打开flag.rar，修改A8 3C 7改成A8 3C 74（不清楚为啥，说是文件头损坏，但是png的文件头不是这个）
 3. 打开后用stegsolve打开，在灰色通道里看见半张二维码，010打开发现文件是gif,有两帧，拼成完整的二维码
+
+## Class10(i春秋）
+1. 增加和修改文件头为89 50 4E 47 0D 0A 1A 0A
+
+## Known（i春秋）
+1. base64解密后与任意一行进行异或操作，得到.7z密码
+2. 观察可知为简单字符替换，编写脚本进行映射和替换
+
+## 那些年我追过的贝丝（i春秋）
+1. base64解码
+
+## Hello World(i春秋)
+1. 签到题，粘贴即可
+
+## 爆破-1（i春秋）
+1. 在URL后加?hello=GLOBALS，将参数hello修改为超全局变量
+
+## 剧情大反转（i春秋）
+1. 字符串逆序
+
+## flag格式（i春秋）
+1. 签到题，粘贴即可
+
+## 爆破-2（i春秋）
+1. payload：?hello=${@eval($_POST[1])} 连蚁剑查看flag.php
+2. 更多解法：https://bbs.ichunqiu.com/forum.php?mod=viewthread&tid=45706
+
+## 泄露的数据（i春秋）
+1. 与数据库有关 + 只有小写和数字
+2. md5解密
+
+## 所以这是13点吗（i春秋）
+1. ROT-13
+
+## challenge（i春秋）
+1. 字母范围a-f + 数字
+2. 16进制转ASCII码
+
+## 考眼力（i春秋）
+1. 凯撒左移一位
+
+## 一个十六岁的少年（i春秋）
+1. 16岁 + 字母范围a-f + 数字
+2. 16进制转ASCII码
+
+## try again(i春秋)
+1. notepad++ 搜索“flag”
+
+## 嘀嘀嘀（i春秋）
+1. 莫斯电码
+
+## 山岚（i春秋）
+1. 栅栏密码
+
+## Vape Nation（i春秋）
+1. G色道0位水印
+
+## 福尔摩斯（i春秋）
+1. 莫斯电码
+
+## 贝丝家族（i春秋）
+1. 字母大写+数字
+2. base32解码
+
+## 签到题2（i春秋）
+1. unicode解码
+
+## 藏在邮件头的秘密（i春秋）
+1. QuotedPrintable解码
+    http://www.mxcz.net/tools/QuotedPrintable.aspx
 
