@@ -572,3 +572,40 @@ f.close()
 1. QuotedPrintable解码
     http://www.mxcz.net/tools/QuotedPrintable.aspx
 
+## very simple math(i春秋)
+1. 分析代码中表达式,为(f14*f13*f12..f1+f14*f13*..*f2+..+f14)*pad = hack
+2.写py脚本爆破
+```
+import itertools
+from hashlib import md5
+hack=280098481791453837177137197730537158171743673148935867304957882116
+dic=[2,2,19,31,59,97,127,3727,44948980991,1753609692783577883,556795634058750798159011]
+
+def f1(arr):#得到取出数的乘积
+    ret=1
+    for i in arr:
+        ret*=i
+    return ret
+
+def f2(a,b,s,n):
+    if a//b-1 in range(32,127):#最后一次f2判断
+        s=s+chr(a//b-1)
+        if len(s)==14:
+            checkmd5(s[::-1],n)#从14开始计算，因此将s倒序，求md5
+    for c in range(32,127):
+        if (a//b-1)%c==0:#(hack/pad - 1) % (fn) = 0，可整除fn
+            f2(a//b-1,c,s+chr(c),n)
+
+def checkmd5(s,n):
+    for c in range(32,127):
+        t=chr(c)+s
+        if int.from_bytes(md5(t.encode('utf-8')).digest(),byteorder='big')==n:
+            print(t)
+
+for i in range(1,12):#穷举hack分解后的所有可能的pad，i为在字典内取出的因数个数
+    for j in itertools.combinations(dic,i):#从字典中取出i个数
+        tmp=f1(j)#得到取出数的乘积
+        if tmp.bit_length() in range(120,129) :#如果pad的乘积长度在121~128比特
+            print(tmp)
+            f2(hack,tmp,'',tmp)#进入下一个函数判断pad
+```
