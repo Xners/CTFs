@@ -609,3 +609,9 @@ for i in range(1,12):#穷举hack分解后的所有可能的pad，i为在字典�
             print(tmp)
             f2(hack,tmp,'',tmp)#进入下一个函数判断pad
 ```
+## Pretty Good Privacy(i春秋）
+1. word文档显色，文件->显示->视图->隐藏文字，发现有隐藏文字 
+2. TrueCrypt软件 使用tcCIS..密码挂载盘，在盘内发现.asc的公钥和私钥
+3. PGP导入两份密钥
+4. PGP导入.docx文件，输入PGPCI..密码
+5. 原文件处右键PGPG->decode，打开解密后的文档，发现flag
