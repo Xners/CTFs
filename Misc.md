@@ -615,3 +615,28 @@ for i in range(1,12):#穷举hack分解后的所有可能的pad，i为在字典�
 3. PGP导入两份密钥
 4. PGP导入.docx文件，输入PGPCI..密码
 5. 原文件处右键PGPG->decode，打开解密后的文档，发现flag
+
+# 流量分析
+## flag被盗
+1. 分组字节流 + 字符串 查找“flag"
+2. 追踪TCP流，可得flag
+
+## 中国菜刀
+1. wireshark打开报错，尝试kali内binwalk
+2. binwalk -e caidao.pcapng
+3. 得到的压缩包解压
+
+## 这么多数据包
+1. getshell 流的TCP报文中很可能包含 command 这个字段。tcp contains "command"过滤
+2. 追踪TCP流，发现base64字段，解码
+
+## 手机流量
+方法一：1. 手机和电脑之间非热点连接，考虑蓝牙协议。obex
+2. 找到secret.rar，导出分组字节流
+方法二：binwalk -e filename
+
+## 日志审计
+1. .log为二分法盲注，因此获取到盲注返回为200的信息，ASCII+1即可得到某位上的正确ASCII码
+   如n>20? 200 ，n>23? 404 , n>22? 200->n=23
+2. 写python脚本，获取字符串的正确值
+   wp:https://www.cnblogs.com/0yst3r-2046/p/12322110.html
