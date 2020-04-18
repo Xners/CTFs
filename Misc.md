@@ -616,27 +616,110 @@ for i in range(1,12):#穷举hack分解后的所有可能的pad，i为在字典�
 4. PGP导入.docx文件，输入PGPCI..密码
 5. 原文件处右键PGPG->decode，打开解密后的文档，发现flag
 
-# 流量分析
+# 流量分析（bugku）
 ## flag被盗
 1. 分组字节流 + 字符串 查找“flag"
 2. 追踪TCP流，可得flag
 
-## 中国菜刀
+## 中国菜刀(bugku)
 1. wireshark打开报错，尝试kali内binwalk
 2. binwalk -e caidao.pcapng
 3. 得到的压缩包解压
 
-## 这么多数据包
+## 这么多数据包(bugku)
 1. getshell 流的TCP报文中很可能包含 command 这个字段。tcp contains "command"过滤
 2. 追踪TCP流，发现base64字段，解码
 
-## 手机流量
+## 手机流量(bugku)
 方法一：1. 手机和电脑之间非热点连接，考虑蓝牙协议。obex
 2. 找到secret.rar，导出分组字节流
 方法二：binwalk -e filename
 
-## 日志审计
+## 日志审计(bugku)
 1. .log为二分法盲注，因此获取到盲注返回为200的信息，ASCII+1即可得到某位上的正确ASCII码
    如n>20? 200 ，n>23? 404 , n>22? 200->n=23
 2. 写python脚本，获取字符串的正确值
    wp:https://www.cnblogs.com/0yst3r-2046/p/12322110.html
+```
+# coding:utf-8
+#py2
+import re
+import urllib
+ 
+f = open('access.log','r')  # 下载的access.log文件的绝对路径
+lines = f.readlines()
+datas = []
+for line in lines:
+    t = urllib.unquote(line)     # 就是将文本进行 urldecode 解码
+    if '1765' in t and 'flag' in t:  # 过滤出与flag相关，正确的猜解（只要200的）
+        datas.append(t)
+ 
+flag_ascii = {}  
+for data in datas:
+    matchObj = re.search( r'LIMIT 0,1\),(.*?),1\)\)>(.*?) AND', data)   # 在date 中搜索符合正则表达的字符串并 将匹配的字符串存入变量 matchObj 中
+    if matchObj:
+        key = int(matchObj.group(1))  # 取变量matchObj 中 的第一个括号里的内容 （也就是上条语句中的 （.*?）中的内容），获取字符所在位置的地方，并转为10进制
+        value = int(matchObj.group(2))+1  # 取变量matchObj中的第二个括号里的内容，获取ASCII码的地方，并转为 10 进制。
+        #由于使用二分法，因此最后一个满足二分条件的ASCII码+1，即获取正确的ASCII码
+
+        flag_ascii[key] = value     # 使用字典，保存最后一次猜解正确的ascii码
+         #如果新添加元素的键与已存在元素的键相同，原来键所对应的值就会被新的值替换掉    
+        
+flag = ''
+for value in flag_ascii.values():
+    flag += chr(value)
+    
+print flag
+```
+## weblogic（bugku）
+1. weblogic + hostname提示
+2. http过滤协议 + 字符串"hostname"，找到两个数据包
+3. 追踪流，在html的网页数据内找到hostname的值
+
+## 信息提取（bugku)
+1. sqlmap盲注，806包开始二分法判断
+2. 过滤http包，文件->导出分组解析结果->为CSV
+3. 写脚本匹配key与key的value值
+```
+import re
+import urllib.parse
+
+# 更改为自己从wireshark提取出的csv文件地址
+f = open(r"httpdata.csv")
+lines = f.readlines()
+datas = []
+# 转码, 保存进datas
+for line in lines:
+    datas.append(urllib.parse.unquote(line))
+urls = []  # 保存注入flag的url
+for i in range(len(datas)):  # 提取出注入flag的url
+    if datas[i].find("isg.flags ORDER BY `value` LIMIT 0,1),1,1))>64") > 0:
+        urls = datas[i:]
+        break
+
+
+flag = {}
+# 用正则匹配
+macth1 = re.compile(r"LIMIT 0,1\),(\d*?),1\)\)>(\d*?) HTTP/1.1")
+macth2 = re.compile(r'"HTTP","(\d*?)","HTTP/1.1 200 OK')
+for i in range(0, len(urls), 2):  # 因为有返回响应, 所以步长为2
+    get1 = macth1.search(urls[i])
+    if get1:
+        key = int(get1.group(1))  # key保存字符的位置
+        value = int(get1.group(2))  # value保存字符的ascii编码
+        get2 = macth2.search(urls[i+1])
+        if get2:
+            if int(get2.group(1)) > 450:
+                value += 1
+        flag[key] = value  # 用字典保存flag
+f.close()
+result = ''
+for value in flag.values():
+    result += chr(value)
+print(result)
+
+
+# ISG{BLind_SQl_InJEcTi0N_DeTEcTEd}
+```
+## 特殊后门（bugku）
+1. 搜icmp，每个包内分别有flag的一个字符，连起来得到flag
