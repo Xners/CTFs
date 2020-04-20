@@ -625,7 +625,8 @@ for i in range(1,12):#穷举hack分解后的所有可能的pad，i为在字典�
 #cat ./O7avZhikgKgbF/flag.txt  
 2. base64解码
 
-
+## pdf
+1. 猜测是图片遮挡了某些文字，全局CTRL+A，复制到文本文档，即可看到。（之前没遇到过这种题，记录一下）
 
 # 流量分析（bugku）
 ## flag被盗
