@@ -616,6 +616,17 @@ for i in range(1,12):#穷举hack分解后的所有可能的pad，i为在字典�
 4. PGP导入.docx文件，输入PGPCI..密码
 5. 原文件处右键PGPG->decode，打开解密后的文档，发现flag
 
+## ext3
+1. Kali内挂载磁盘文件  
+#mkdir e  
+#mount -t ext3 f1fc23f5c743425d9e0073887c846d23 e/  
+#cd e
+#find | grep 'flag'
+#cat ./O7avZhikgKgbF/flag.txt  
+2. base64解码
+
+
+
 # 流量分析（bugku）
 ## flag被盗
 1. 分组字节流 + 字符串 查找“flag"
