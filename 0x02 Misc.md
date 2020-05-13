@@ -746,3 +746,381 @@ print(result)
 7. 在windows路径下合并5个包（原因未知）cmd窗口内：copy /B 文件1+文件2+... 合并文件名.rar
 8. rar伪加密，第二行offset 7处的字节为加密位，将“84”改为“80”（原因未知），解开压缩包
 9. flag.txt放入Kali内 foremost，得到多张图片，扫描图片内二维码即可拿到flag
+
+## 就在其中(攻防世界）
+1. 在ftp-data处导出分组字节流
+2. 依次可以导出key.zip(内含key.txt)、test.key（私钥）、pub.key（公钥）
+3. openssl rsautl -decrypt -in key.txt -inkey test.key -out flag.txt （-in 为要解密的加密文档 -inkey 为密钥 -out 为输出文档）
+4. 打开flag.txt，即可拿到flag
+
+
+## 再见李华
+	1. 
+foremost分离出压缩包
+	2. 
+1000为二进制8，猜测密码为8位以上（脑洞过大。。），加上署名LiHua
+	3. 
+爆破xxxxLiHua，得到压缩包密码，解压得到flag
+
+
+## Get-the-key.txt（攻防世界）
+	1. 
+mount -o loop forensic100 /tmp/forensic100  挂载文件
+	2. 
+grep -r key.txt
+	3. 
+gunzip < 1 读取文件
+	4. 
+（我是strings forensic，拿形似flag的字符串一个个去试的…没懂这题在考啥）
+
+
+## 打野(图像隐写)（攻防世界）
+	1. 
+root@kali:~/zsteg# zsteg '/root/2.bmp'
+
+
+zsteg安装：
+git clone https://github.com/zed-0xff/zsteg
+cd zsteg/
+gem sources --remove https://rubygems.org/
+gem sources --add https://gems.ruby-china.com/
+gem sources -l
+gem install zsteg
+## 2-1(攻防世界）
+	1. 
+修改文件头为png头部
+	2. 
+已知CRC值和png图片宽，爆破出高的十进制值
+	3. 
+转换十进制为十六进制
+
+
+```
+import os
+import binascii
+import struct
+
+misc = open("misc4.png","rb").read()
+
+for i in range(1024):
+    data = misc[12:16] + struct.pack('>i',i)+ misc[20:29]#'>i':按照高位顺序来格式化取得一个int或long值
+    #CRC校验从x49x48x44x52开始
+    #data = 'x49x48x44x52x00x00x01xF4' + height + 'x08x06x00x00x00'
+    
+    #29到32的4个字节为CRC
+    crc32 = binascii.crc32(data) & 0xffffffff
+    if crc32 == 0x932f8a6b:
+        print (i)#输出高的十进制数值
+        #print(''.join(map(lambda c: "%02X" % ord(c), height)))
+        #%02x  (x代表以十六进制形式输出,02代表不足两位，前面补0输出，如果超过两位，则以实际输出)
+```
+
+##  phrackCTF取证2（i春秋）
+	1. 
+file filename查看文件属性
+	2. 
+volatility -f mem.vmem imageinfo查看内存映像
+	3. 
+volatility -f mem.vmem --profile=WinXPSP2x86 psscan查看进程，其中Win的号码根据上面的image拿到
+	4. 
+volatility -f mem.vmem --profile=WinXPSP2x86 memdump -p 2012 -D /tmp导出内存数据，此路径为在 Kali/计算机/tmp
+	5. 
+使用Elcomsoft Forensic Disk Decryptor（win下取证工具）导出truecrypt的key [该工具的使用https://www.freebuf.com/column/152545.html]
+	6. 
+使用Elcomsoft Forensic Disk Decryptor挂载suspicion
+	7. 
+得到文件名为PCTF{T2reCrypt***********cu2e}文件
+
+
+
+## 4.24流量取证(BOC)
+	1. 
+volatility -f forensic.vmem imageinfo
+	2. 
+volatility -f forensic.vmem --profile=WinXPSP2x86 pslist 查进程
+	3. 
+volatility -f forensic.vmem --profile=WinXPSP2x86 cmdscan 查看cmd历史进程，得到cmd hill密钥字符串322 977 649
+	4. 
+volatility -f forensic.vmem --profile=WinXPSP2x86 cmdline 查看命令行所用到的参数，发现可能通过写字板程序产生了一个文件：disk.zip
+	5. 
+volatility -f forensic.vmem --profile=WinXPSP2x86 memdump -p 1640 -D ./  导出cmd.exe内容，1640为进程PID号。路径在当前文件夹(作用是查看cmd可能使用的命令，不推荐)
+	6. 
+strings 1640.dmp >cmd.txt 将exe内容转化为txt文件
+	7. 
+volatility -f forensic.vmem --profile=WinXPSP2x86 filescan | grep disk.zip 查找disk.zip文件，开头0xn十六进制为文件地址
+	8. 
+volatility -f forensic.vmem --profile=WinXPSP2x86 dumpfiles -Q 0x1873e40 --dump-dir=./ (导出后可能为dat文件，自行修改文件名和后缀即可)解压缩，可得img文件
+	9. 
+mount disk.img ./a 挂载img文件 (需要先mkdir a，建立挂载点)(挂载需要在linux系统中操作，否则会出现无法挂载或挂载后没有文件的问题)
+	10. 
+查看./a内，看到usb.pcapng文件，
+	11. 
+tshark -r usb.pcapng，显示USB_Interrupt in,表示为USB键盘流量
+	12. 
+tshark -r usb.pcapng -T fields -e usb.capdata > usbdata.txt 使用tshark导出USB流量文件
+	13. 
+8字节，为键盘输入。将键盘按键按照对应关系输出出来，脚本如下：
+
+
+```
+mappings = { 0x04:"A",  0x05:"B",  0x06:"C", 0x07:"D", 0x08:"E", 0x09:"F", 0x0A:"G",  0x0B:"H", 0x0C:"I",  0x0D:"J", 0x0E:"K", 0x0F:"L", 0x10:"M", 0x11:"N",0x12:"O",  0x13:"P", 0x14:"Q", 0x15:"R", 0x16:"S", 0x17:"T", 0x18:"U",0x19:"V", 0x1A:"W", 0x1B:"X", 0x1C:"Y", 0x1D:"Z", 0x1E:"1", 0x1F:"2", 0x20:"3", 0x21:"4", 0x22:"5",  0x23:"6", 0x24:"7", 0x25:"8", 0x26:"9", 0x27:"0", 0x28:"n", 0x2a:"[DEL]",  0X2B:"    ", 0x2C:" ",  0x2D:"-", 0x2E:"=", 0x2F:"[",  0x30:"]",  0x31:"'\'", 0x32:"~", 0x33:";",  0x34:"'", 0x36:",",  0x37:"." }
+nums = []
+keys = open('usbdata.txt')
+for line in keys:
+    if line[0]!='0' or line[1]!='0' or line[3]!='0' or line[4]!='0' or line[9]!='0' or line[10]!='0' or line[12]!='0' or line[13]!='0' or line[15]!='0' or line[16]!='0' or line[18]!='0' or line[19]!='0' or line[21]!='0' or line[22]!='0':
+         continue
+    nums.append(int(line[6:8],16))
+keys.close()
+output = ""
+for n in nums:
+    if n == 0 :
+        continue
+    if n in mappings:
+        output += mappings[n]
+    else:
+        output += '[unknown]'
+print 'output :n' + output
+```
+	1. 
+对字符串'WYTXRXORCQDH'进行希尔解密[https://www.dcode.fr/hill-cipher]，矩阵为3*3格式：322 977 649
+
+
+
+## 我们的秘密是绿色的（XCTF）
+	1. 
+oursecret软件内输入密码，解密得到try.zip，另存为try.zip
+	2. 
+发现注释 生日+密码 考虑数字爆破
+	3. 
+得到两个文件，考虑明文攻击
+	4. 
+新的zip包为伪加密，修改标志位 010908 改成000908
+	5. 
+栅栏密码解密
+	6. 
+凯撒解密
+
+
+## reverse it(XCTF)
+	1. 
+#xxd -p 1 | tr -d '\n' | rev | xxd -r -p > reversed  倒序输出新文件
+	2. 
+#convert -flop reversed reversed.jpg  水平镜像反转图片
+
+
+## glance-50(XCTF)
+	1. 
+利用工具分离帧，命名方式为Frame1.png Frame2.png等
+	2. 
+#convert +append Frame*.png output.gif 合并、拼接图像
+
+
+## 黄金6年(XCTF)
+	1. 
+ffmpeg -i 1.mp4 -r 60 -f image2 j-%05d.bmp  分离.mp4文件(或ps打开，手动分出含二维码的帧)
+	2. 
+发现四张图片中有隐藏二维码，扫码得到密码 iwantplayctf
+	3. 
+mp4文件尾部有base64，解码得到rar原始数据，另存为1.rar
+	4. 
+输入密码，得到flag.txt，flag到手
+
+
+## flag_universe(XCTF)
+	1. 
+将所有含PNG文件头的字节流都save as原始数据导出，依次命名为n.png  （显示不全图片不知道为什么。。）
+	2. 
+zsteg '/root/0.png'
+
+
+## 互相伤害（XCTF）
+	1. 
+看到wireshark，将文件修改为.cap文件
+	2. 
+打开数据包后发现传输一堆图片，全部导出
+	3. 
+一张图片内有二维码，根据图片内AES和CTF提示，扫描后进行AES解码 密钥是CTF，得到668b13e0b0fc0944daf4c223b9831e49（用QQ扫描效果更好）
+	4. 
+“来啊互相伤害啊”图片可以分离出zip包
+	5. 
+用AES解密的密码进行解压，得到二维码
+	6. 
+将小二维码截出后反色，扫描得到flag
+
+
+## 隐藏的信息(XCTF)
+	1. 
+观察数字没有超过8的，猜测为8进制。8进制转ASCII，得到字符串
+	2. 
+字符串base64解码，得到flag
+
+
+## 奇怪的TTL字段（XCTF）
+	1. 
+观察看到数字都是2的幂次方-1，猜测其为二进制表示
+
+
+```
+import re
+
+#打开题目内容
+txt = open("ttl.txt",'r')
+flag = open("flag",'w')
+#按行读取
+line = txt.readlines()
+number = ""for i in line:
+#对数字进行判断和整理
+num1 = "".join(re.findall("TTL=(.*)",i))
+if(num1 == '63'):
+n = '00'
+if(num1 == '127'):
+n = '01'
+if(num1 == '191'):
+n = '10'
+if(num1 == '255'):
+n = '11'
+number += n
+#对得到的所有二进制数八位一组进行分割
+step = 8
+cut = [number[i:i+step] for i in range(0,len(number),step)]
+arry = []
+for i in cut:
+        arry.append(i)
+for i in arry:
+        flag.write(chr(int(i,2)))
+	1. 
+将产生的字符串，hxd里粘贴到hex处
+	2. 
+使用foremost进行分离（很奇怪，binwalk无法分离出来图片，foremost只能分离出来5张图片。使用dd if=allpng of=2.png bs=1 skip=5892 手动分出6张图片）
+	3. 
+PPT内拼接，得到二维码，扫描得到key:AutomaticKey cipher:fftu{2028mb39927wn1f96o6e12z03j58002p}
+	4. 
+涉及到自动密钥密码，在线解码[https://www.wishingstarmoye.com/ctf/autokey]，得到flag
+
+
+## become_a_rockstar(XCTF)
+	1. 
+看wp知道这是一种rockstar新的编码。。。（# git clone https://github.com/yanorestes/rockstar-py.git）
+	2. 
+# rockstar-py Become_a_Rockstar.rock （但是此处命令行提示rockstar-py未找到命令，无法继续做下去）
+
+
+## 信号不好先挂了
+	1. 
+图片提取最低位，得到zip包
+	2. 
+解压后发现一张一样的图片，异或操作后没有区别，考虑盲水印
+	3. 
+python bwm.py decode apple.png pen.png appleflag.png
+
+
+## Disk
+	1. 
+拖入hex，发现有flag0.txt等几个txt
+	2. 
+发现txt后面Hex的位置有可疑的01字符串，依次拼接得到： 0110011001101100011000010110011101111011001101000100010001010011010111110011000101101110010111110100010000110001011100110110101101111101
+	3. 
+经验：01100110 为f的二进制ASCII码值，需要保持敏感度
+
+
+## Ditf
+	1. 
+将png图片拖入kali，发现无法打开，提示CRC校验错误，脚本跑图片的高为00000514，修改高
+	2. 
+png可以分离出压缩包，binwalk分离后，使用图片内的密码解密
+	3. 
+解密得到流量包，分析流量可以看到传输过kiss.png图片，追踪http流，得到base64字符串，解码得到flag
+
+
+## 5-1
+	1. 
+使用xortool工具（安装：pip install -i http://pypi.douban.com/simple/ --trusted-host pypi.douban.com xortool）
+	2. 
+xortool -c 20 filename 得到key
+	3. 
+脚本异或解密（不明白为什么要这么做,用key循环异或文件）
+
+
+```
+key = 'GoodLuckToYou'
+flag = ''
+with open('ba') as f:
+    con = f.read()
+    for i in range(len(con)):
+        flag += chr(ord(con[i]) ^ ord(key[i%13]))
+f = open('flag.txt', 'w')
+f.write(flag)
+f.close()
+```
+	1. 
+输出的txt内得到flag
+
+
+## misc1
+	1. 
+ 每两个字符分组十六进制，转成十进制后-128(偏移量为128)，再转成ascii码得到flag
+
+
+```
+string = "d4e8e1f4a0f7e1f3a0e6e1f3f4a1a0d4e8e5a0e6ece1e7a0e9f3baa0c4c4c3d4c6fbb9e1e6b3e3b9e4b3b7b7e2b6b1e4b2b6b9e2b1b1b3b3b7e6b3b3b0e3b9b3b5e6fd"
+flag = ''
+for i in range(0,len(string), 2):
+    s = "0x" + string[i] + string[i+1]
+    flag += chr(int(s, 16) - 128)
+print(flag)
+```
+## Miscellaneous-200
+	1. 
+分解行数得到图片宽高 多次尝试后得到503*122
+	2. 
+画图
+
+
+## Miscellaneous-300
+	1. 
+爆破发现zip包内的包名即为外层压缩包密码，shell脚本爆破
+	2. 
+编写shell脚本（并不会，拿的大佬的脚本）
+
+
+```
+#!/usr/bin/env bash
+while [ -e *.zip ]; do
+  files=*.zip;
+  for file in $files; do
+    echo -n "Cracking ${file}… ";
+    output="$(fcrackzip -u -l 1-6 -c '1' *.zip | tr -d '\n')";
+    password="${output/PASSWORD FOUND\!\!\!\!: pw == /}";
+    if [ -z "${password}" ]; then
+      echo "Failed to find password";
+      break 2;
+    fi;
+    echo "Found password: \`${password}\`";
+    unzip -q -P "${password}" "$file";
+    rm "${file}";
+  done;
+done;
+```
+	1. bash *.sh (若报错发现格式错误 ，notepad++右下角将windows模式改为linux模式)
+	2. fcrackzip -u -l 1-6 -c 'a1' 12475.zip   得到最后一个压缩包密码‘a1’为字母和数字
+	3. unzip -q -P b0yzz 12475.zip 将最后一个压缩包解压
+	4. 将.wav拖到Auti里查看频谱图，得到flag
+
+* fcrackzip参数说明
+-b 表示brute-force 暴力破解
+-l 密码长度
+-c 指定的字符集合
+c的字符集合有:a [a-z]
+A[A-Z]
+1[0-9]
+![一些神奇的其他字符]
+
+## Avatar
+	1. outguess -r lamb.jpg 1.txt  （outguess也是一款隐写软件）
+
+
+
+安装outguess
+#git clone https://github.com/crorvick/outguess
+#cd outguess
+#./configure && make && make install
