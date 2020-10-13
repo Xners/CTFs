@@ -1031,3 +1031,163 @@ A[A-Z]
 #cd outguess
 #./configure && make && make install
 
+## 4-2
+	1. 
+频率密码（分值设置有问题。。）
+
+
+## Excaliflag
+	1. 
+stego查看就可得到flag（不懂为什么这么高分）
+
+
+## 3-1
+	1. 
+导出http对象可以得到flag.rar(不能用导出字节流，原因未知-。-)
+	2. 
+追踪流可以看到一段python和一段base64字符串
+	3. 
+改写脚本（这步有点迷，没想到解密后的字符串在函数里再次解密，经验不足）
+
+
+```
+str = '19aaFYsQQKr+hVX6hl2smAUQ5a767TsULEUebWSajEo='
+print(decrypt(base64.b64decode(str)))
+```
+	1. 
+拿到rar密码，解压缩包即可
+
+
+
+
+## rc4-poor-rsa
+	1. 
+解压缩得到flag.b64和key.pub，key.pub为公钥
+	2. 
+对密文先base64解码再RSA解密
+
+
+```
+#/usr/bin/env python3
+#coding:utf-8
+#power by jedi
+
+from Crypto.PublicKey import RSA
+import gmpy2
+import rsa
+import base64
+
+#1.从公钥文件中分解n和e
+public_key = RSA.importKey(open("key.pub").read())
+n = public_key.n
+e = public_key.e
+
+p = 863653476616376575308866344984576466644942572246900013156919
+q = 965445304326998194798282228842484732438457170595999523426901
+d = int(gmpy2.invert(e, (p-1)*(q-1)))
+
+private_key = rsa.PrivateKey(n, e, d, p, q)#生成私钥
+with open("flag.b64") as f:
+    ff = f.read()
+    c =base64.b64decode(ff)#base64解码
+    flag = rsa.decrypt(c, private_key)
+    print(flag)
+```
+## 说我作弊需要证据
+	1. 
+查看流量包，13->37传输数据，即Alice发送给Bob
+	2. 
+追踪TCP包，发现大量base64字符串，解码可以得到序列号、data、sig等字段，猜测即为二人秘密传输的内容
+	3. 
+计算二人私钥，A的私钥用来签名验签，B的私钥用来解密data
+	4. 
+编写脚本并根据序号排序即可
+
+
+## RSA（bugku）
+	1. 
+RsaCtfTools无法使用，调试中
+
+
+## flag_in_your_hand/1
+	1. 
+浏览器断点调试js，可以看到每次都用ck函数进行判断
+	2. 
+分析ck函数，若想使结果为true，必须要使得字符串为a[]中各元素-3。编写脚本
+
+
+```
+a = [118, 104, 102, 120, 117, 108, 119, 124, 48,123,101,120]
+s = ''
+for i in a:
+    n = chr(i-3)
+    s += n
+print(s)
+```
+## 工控安全取证
+	1. 
+每次扫描前都用ICMP进行探测，过滤ICMP协议
+	2. 
+99是被攻击机器，查看99收到的request请求。
+	3. 
+为什么第四次攻击是取0.199而不是0.1发起的不明白。之前做过这个题，是随机提交的。。
+
+
+## 工业协议分析2
+	1. 
+多个UDP协议包，分析其包长Len，除了 12，89，104，105，131，137出现一次，其余长度都是多次出现
+	2. 
+分析长度仅有一次的异常包，在包号648，包长Len=137的包内，发现Data处有明显十六进制flag串“666c61677b37466f4d3253746b6865507a7d”
+	3. 
+tips: 6b和6d分别对应{}，66为"f"，要有做题的敏感度
+
+
+## 工业协议分析1
+	1. 
+使用linux命令对可能出现的关键词进行搜索（骚操作学到了）
+	2. 
+grep "flag" -a test.pacp
+	3. 
+grep ".zip" -a test.pacp
+	4. 
+grep ".jpg" -a test.pacp
+	5. 
+grep ".png" -a test.pacp
+	6. 
+搜索png的时候，发现一张base64image编码的图片，解码（粘贴到浏览器即可）可得flag
+
+
+## Easy-one
+	1. 
+通过给出的测试案例，计算真实的key
+	2. 
+通过真实的key，解密msg002.enc
+	3. 
+tips:加密过程的逆向操作很重要，本处需要将加密时候的字符串抽象为位运算
+
+
+## enc
+	1. 
+notepad++ 替换空格：选择“正则表达式”，空格为“\s”
+	2. 
+coverter内进行二进制和字符串转换
+	3. 
+最后的flag需要手动加括号和去掉O，比较坑。。。
+
+
+##misc_pic_again
+	1. 
+最低位提取出zip包
+	2. 
+解压，strings 1，即可看到flag
+
+
+## Py-Py-Py（Bugku中的QAQ和此题类似）
+	1. 
+pyc文件隐写，在stegosaurus文件夹下， python .\stegosaurus.py -x .\2.pyc
+	2. 
+即可提取出flag
+	3. 
+tips:file显示为python，则可以修改后缀为pyc，遇到.pyc文件可以尝试此种方法提取。
+
+
