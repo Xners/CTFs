@@ -1190,4 +1190,179 @@ pyc文件隐写，在stegosaurus文件夹下， python .\stegosaurus.py -x .\2.p
 	3. 
 tips:file显示为python，则可以修改后缀为pyc，遇到.pyc文件可以尝试此种方法提取。
 
+## keyword
+	1. 
+加密的lsb隐写，cloacked-pixel文件夹下： python lsb.py extract a63369affda14efeaa2a61ae57042356.png hey.txt lovekfc
+	2. 
+虚无密码（Nihilist cipher） 将关键词提前到字母前面，其余字母顺序皆不变
+
+
+```
+a1 = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+b1 = "LOVEKFCABDGHIJMNPQRSTUWXYZ"
+a2 = a1.lower()
+b2 = b1.lower()
+str = "PVSF{vVckHejqBOVX9C1c13GFfkHJrjIQeMwf}"
+for i in str:
+    if(i in b1):
+        print(a1[b1.index(i)],end="")
+    elif(i in b2):
+        print(a2[b2.index(i)],end="")
+    else:
+        print(i,end="")
+```
+## hidden-message
+	1. 
+端口变化，3401为‘0’，3400为‘1’
+	2. 
+写脚本遍历端口情况，输出二进制，转为字符串
+
+
+## reverseMe
+	1. 
+convert -flop 0.jpg reversed.jpg 
+
+
+## recover-deleted-file
+	1. 
+使用extundelete命令报错
+
+
+## decypt-the-message
+	1. 
+poem cipher……加密时选取的单词没理解
+	2. 
+root@kali:~/crypto-tools/poemcode# python poemcode.py 1 2   （1为去除标点符号的诗歌，2为密文消息）
+
+
+## rsa_gcd
+	1. 
+n1和n2有最大公约数，通过公约数进行分解n
+	2. 
+正常步骤求解得到m
+
+
+## best_rsa
+	1. 
+共模攻击
+
+
+## sleeping-guard
+	1. 
+cat 64 | base64 -d > sleeping.png（一句话解密并将解密后的二进制保存至png） 
+	2. 
+与正常png图片的头部尝试xor操作，得到异或使用的字符串
+
+
+```
+header = [0x89,0x50,0x4E,0x47,0x0D,0x0A,0x1A,0x0A,0x00,0x00,0x00,0x0D,0x49,0x48,0x44,0x52]
+f = open('sleeping.png', 'r')  #我的电脑读文件时总要加上encoding='ISO-8859-1'
+xor = ''
+data = f.read()
+i = 0
+for char in data:
+    xor += chr(ord(char) ^ header[i % len(header)])
+    i += 1
+print(xor[:20])
+```
+	1. 
+找到异或使用的字符串后，对整个base64解码的文件进行异或操作
+
+
+```
+#header = [0x89,0x50,0x4E,0x47,0x0D,0x0A,0x1A,0x0A,0x00,0x00,0x00,0x0D,0x49,0x48,0x44,0x52]
+x = 'WoAh_A_Key!?'
+f = open('sleeping.png', 'r')#加了encoding='ISO-8859-1'，跑出来结果错误
+f2 = open('sleep.png','w')
+xor = ''
+data = f.read()
+i = 0
+for char in data:
+    xor += chr(ord(char) ^ ord(x[i % len(x)]))
+    i += 1
+f2.write(xor)
+```
+	1. 
+查看图片
+
+
+## aweirdcprogram
+	1. 
+首先，我将所有不是新行的字符更改为另一个字符（在本例中为下划线）。tr -c '\t \n' '_' < program.cpp
+	2. 
+然后，我决定将所有制表符都视为1。tr -c '\t \n' '_' < program.cpp | tr '\t' 1
+	3. 
+这意味着所有空格必须为0。tr -c '\t \n' '_' < program.cpp | tr '\t' 1 | tr " " "0"
+	4. 
+然后，我将删除所有其余的下划线。tr -c '\t \n' '_' < program.cpp | tr '\t' 1 | tr " " "0" | tr -d "_"
+	5. 
+得到01字符串
+
+
+## 流量分析
+	1. 
+盲注，编写脚本匹配字母的最后一次探测字符
+
+
+## regexpire
+	1. 
+pwn进行交互，匹配出现的正则表达式
+
+
+```
+from pwn import *
+import rstr
+import exrex
+from time import sleep
+import re
+# conect to server
+r = remote(124.126.19.106,31833)
+# Print the question string
+print r.recvline()
+# Counter
+i=1
+while True:
+# Recieve the regex pattern
+    reg = r.recvline()[:-1]
+    print "%d -------\n"%i
+    print reg
+    print "-------\n"
+    ans=rstr.xeger(reg).replace('\n','') # Remove newlines!
+    # ans=exrex.getone(reg).replace('\n','')  # Another possible option
+    r.sendline(ans)
+    i+=1
+     sleep(0.2)
+```
+## funny video
+	1. 
+E:\ctf\4-长亭工具\Mkvtoolnix\mkvtoolnix-64bit-12.0.0\mkvtoolnix\mkvtoolnix-gui.exe 查看音轨
+	2. 
+提取多余的mp3音轨，放入audacity查看频谱图，拿到flag
+
+
+## 神奇的压缩文件
+	1. 
+大小变化，放入NTFS流文件工具内，可以从Misc100.txt里提取出flag.zip
+	2. 
+按照wp，将flag.zip的注释进行变换：注释复制到notepad内，\t（tab符）替换为1，空格替换为0，得到二进制序列，高位补0，转换为ascii码
+
+
+## hong
+	1. 
+foremost分离得到图片
+
+
+## CRC
+	1. 
+crc32爆破，得压缩包密码
+	2. 
+解压后得到.txt，二进制转字符串得到base64加密图片，浏览器输入base64字符串，扫码
+
+
+## 4433
+	1. 
+stegsolve切换通道得到二维码
+	2. 
+扫描得到…–.—-…–..，一看到这个便是摩斯密码，根据题目4433，想到可能是密文分割的提示，解密摩尔斯密码得到VYGUD，这当然不是最终的密码，搜索摩斯密码缩写看到,VY表示VERY，GUD表示GOOD最终得出flag{VERYGOOD}
+
 
